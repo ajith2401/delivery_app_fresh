@@ -26,7 +26,7 @@ default: 0
 preferredLanguage: {
 type: String,
 enum: ['english', 'tamil'],
-default: 'english'
+// default: 'english'
 },
 lastInteractionAt: {
 type: Date,
