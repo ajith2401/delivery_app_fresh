@@ -6,6 +6,7 @@ const DialogflowService = {
 detectIntent: async (projectId, sessionId, query, messageType = 'text', language = 'english') => {
 try {
 // Create a session client
+console.log(`Attempting to detect intent for project: ${projectId}, session: ${sessionId}`);
 const sessionClient = new dialogflow.SessionsClient();
 const sessionPath = sessionClient.projectAgentSessionPath(projectId, sessionId);
   // Set language code based on user preference
@@ -50,6 +51,9 @@ const sessionPath = sessionClient.projectAgentSessionPath(projectId, sessionId);
   
   // Send request to Dialogflow
   const responses = await sessionClient.detectIntent(queryParams);
+  console.log('====================================');
+  console.log(responses[0].queryResult);
+  console.log('====================================');
   const result = responses[0].queryResult;
   
   // Process the response

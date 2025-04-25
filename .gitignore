@@ -1,3 +1,5 @@
 .env
 
-node_modulesdialogflow-credentials.json
+dialogflow-credentials.json
+
+node_modules
