@@ -1,0 +1,43 @@
+{
+    "id": "00000000-0000-0000-0000-00000000000a",
+    "displayName": "Order History",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "order history"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "past orders"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "previous orders"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "show all my orders"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "எனது முந்தைய ஆர்டர்கள்"
+          }
+        ]
+      }
+    ]
+  }

@@ -1,0 +1,62 @@
+{
+  "description": "WhatsApp Food Delivery Bot for Tamil Nadu",
+  "language": "en",
+  "shortDescription": "Order food via WhatsApp in Tamil Nadu",
+  "examples": "",
+  "linkToDocs": "",
+  "displayName": "TamilFoodsBot",
+  "activeAssistantAgents": [
+    "smalltalk-domain-on"
+  ],
+  "disableInteractionLogs": false,
+  "disableStackdriverLogs": true,
+  "googleAssistant": {
+    "googleAssistantCompatible": false,
+    "project": "",
+    "welcomeIntentSignInRequired": false,
+    "startIntents": [],
+    "systemIntents": [],
+    "endIntentIds": [],
+    "oAuthLinking": {
+      "required": false,
+      "providerId": "",
+      "authorizationUrl": "",
+      "tokenUrl": "",
+      "scopes": "",
+      "privacyPolicyUrl": "",
+      "grantType": "AUTH_CODE_GRANT"
+    },
+    "voiceType": "VOICE_TYPE_UNSPECIFIED",
+    "capabilities": [],
+    "env": "",
+    "protocolVersion": "PROTOCOL_VERSION_UNSPECIFIED",
+    "autoPreviewEnabled": false,
+    "isDeviceAgent": false
+  },
+  "defaultTimezone": "Asia/Kolkata",
+  "webhook": {
+    "url": "https://your-webhook-url.com/webhook/dialogflow",
+    "username": "",
+    "headers": {
+      "": ""
+    },
+    "available": true,
+    "useForDomains": false,
+    "cloudFunctionsEnabled": false,
+    "cloudFunctionsInitialized": false
+  },
+  "isPrivate": true,
+  "mlMinConfidence": 0.3,
+  "supportedLanguages": [
+    "ta"
+  ],
+  "enableOnePlatformApi": true,
+  "onePlatformApiVersion": "v2beta1",
+  "secondaryKey": "",
+  "analyzeQueryTextSentiment": false,
+  "enabledKnowledgeBaseNames": [],
+  "knowledgeServiceConfidenceAdjustment": 0.0,
+  "dialogBuilderMode": false,
+  "baseActionPackagesUrl": "",
+  "enableSpellCorrection": false
+}

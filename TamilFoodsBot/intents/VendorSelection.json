@@ -1,0 +1,71 @@
+{
+    "id": "00000000-0000-0000-0000-00000000000d",
+    "displayName": "Vendor Selection",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "vendor-id-param",
+        "displayName": "vendor_id",
+        "required": true,
+        "entityTypeDisplayName": "@sys.any"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "choose vendor "
+          },
+          {
+            "text": "123456",
+            "entityType": "@sys.any",
+            "alias": "vendor_id"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "show me menu of "
+          },
+          {
+            "text": "Amma's Kitchen",
+            "entityType": "@sys.any"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "I want to order from "
+          },
+          {
+            "text": "Tamil Flavors",
+            "entityType": "@sys.any"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "5f8d3e22b54764e12c9b3a8f",
+            "entityType": "@sys.any",
+            "alias": "vendor_id"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "select restaurant "
+          },
+          {
+            "text": "12345",
+            "entityType": "@sys.any",
+            "alias": "vendor_id"
+          }
+        ]
+      }
+    ]
+  }

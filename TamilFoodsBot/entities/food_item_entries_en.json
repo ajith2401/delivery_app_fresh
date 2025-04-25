@@ -1,0 +1,54 @@
+[
+    {
+      "value": "biryani",
+      "synonyms": [
+        "biryani",
+        "briyani",
+        "biriyani",
+        "chicken biryani",
+        "mutton biryani",
+        "veg biryani",
+        "பிரியாணி"
+      ]
+    },
+    {
+      "value": "dosa",
+      "synonyms": [
+        "dosa",
+        "dosai",
+        "plain dosa",
+        "masala dosa",
+        "ghee dosa",
+        "paper dosa",
+        "தோசை"
+      ]
+    },
+    {
+      "value": "idli",
+      "synonyms": [
+        "idli",
+        "idly",
+        "steamed rice cake",
+        "இட்லி"
+      ]
+    },
+    {
+      "value": "parotta",
+      "synonyms": [
+        "parotta",
+        "barotta",
+        "paratha",
+        "layered flatbread",
+        "பரோட்டா"
+      ]
+    },
+    {
+      "value": "sambar",
+      "synonyms": [
+        "sambar",
+        "sambhar",
+        "lentil stew",
+        "சாம்பார்"
+      ]
+    }
+  ]

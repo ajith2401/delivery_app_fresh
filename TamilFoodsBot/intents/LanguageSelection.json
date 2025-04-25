@@ -1,0 +1,52 @@
+{
+  "id": "f0e94d7b-ba37-4cf0-a01f-5c7a9c2da7e2",
+  "name": "Language Selection",
+  "auto": true,
+  "contexts": [],
+  "responses": [
+    {
+      "resetContexts": false,
+      "action": "setLanguage",
+      "affectedContexts": [],
+      "parameters": [
+        {
+          "id": "2b91e4f9-bb6d-48c1-a0ec-62d16b9cf82e",
+          "name": "language",
+          "required": true,
+          "dataType": "@language",
+          "value": "$language",
+          "defaultValue": "english",
+          "isList": false,
+          "prompts": [
+            {
+              "lang": "en",
+              "value": "Which language would you prefer? English or Tamil?"
+            }
+          ],
+          "promptMessages": [],
+          "noMatchPromptMessages": [],
+          "noInputPromptMessages": [],
+          "outputDialogContexts": []
+        }
+      ],
+      "messages": [
+        {
+          "type": "0",
+          "title": "",
+          "textToSpeech": "",
+          "lang": "en",
+          "condition": ""
+        }
+      ],
+      "speech": []
+    }
+  ],
+  "priority": 500000,
+  "webhookUsed": true,
+  "webhookForSlotFilling": false,
+  "fallbackIntent": false,
+  "events": [],
+  "conditionalResponses": [],
+  "condition": "",
+  "conditionalFollowupEvents": []
+}

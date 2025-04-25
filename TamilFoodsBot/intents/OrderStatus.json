@@ -1,0 +1,82 @@
+{
+    "id": "00000000-0000-0000-0000-00000000000b",
+    "displayName": "Order Status",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "order-id-param",
+        "displayName": "order_id",
+        "required": false,
+        "entityTypeDisplayName": "@sys.any"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "track my order"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "where is my order"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "order status"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "check order "
+          },
+          {
+            "text": "123456",
+            "entityType": "@sys.any",
+            "alias": "order_id"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "order:"
+          },
+          {
+            "text": "60a3b7c8edf14b2d7c5e72a1",
+            "entityType": "@sys.any",
+            "alias": "order_id"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "my orders"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "எனது ஆர்டர் நிலை"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "my_orders"
+          }
+        ]
+      }
+    ]
+  }

@@ -1,0 +1,70 @@
+{
+    "id": "00000000-0000-0000-0000-000000000009",
+    "displayName": "Menu Browsing",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "category-param",
+        "displayName": "category",
+        "required": true,
+        "entityTypeDisplayName": "@sys.any"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "category:"
+          },
+          {
+            "text": "Starters",
+            "entityType": "@sys.any",
+            "alias": "category"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "show items in "
+          },
+          {
+            "text": "Main Course",
+            "entityType": "@sys.any",
+            "alias": "category"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "what's in "
+          },
+          {
+            "text": "Desserts",
+            "entityType": "@sys.any",
+            "alias": "category"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "Biryanis",
+            "entityType": "@sys.any",
+            "alias": "category"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "category:Dosas",
+            "entityType": "@sys.any",
+            "alias": "category"
+          }
+        ]
+      }
+    ]
+  }

@@ -1,0 +1,36 @@
+[
+    {
+      "value": "COD",
+      "synonyms": [
+        "COD",
+        "Cash on Delivery",
+        "cash",
+        "pay with cash",
+        "pay at delivery",
+        "பணம்",
+        "ரொக்கம்"
+      ]
+    },
+    {
+      "value": "ONLINE",
+      "synonyms": [
+        "online",
+        "card",
+        "credit card",
+        "debit card",
+        "netbanking",
+        "ஆன்லைன்"
+      ]
+    },
+    {
+      "value": "UPI",
+      "synonyms": [
+        "UPI",
+        "Google Pay",
+        "GPay",
+        "PhonePe",
+        "Paytm",
+        "BHIM"
+      ]
+    }
+  ]

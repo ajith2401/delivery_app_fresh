@@ -1,0 +1,64 @@
+{
+    "id": "00000000-0000-0000-0000-000000000008",
+    "displayName": "Help",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "help"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "how to use"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "how does this work"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "instruction"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "guide"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "support"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "i need help"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "உதவி"
+          }
+        ]
+      }
+    ]
+  }

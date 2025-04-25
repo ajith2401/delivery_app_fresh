@@ -1,0 +1,71 @@
+{
+    "id": "00000000-0000-0000-0000-000000000006",
+    "displayName": "Browse Nearby Vendors",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "show nearby restaurants"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "nearby home cooks"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "nearby vendors"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "who delivers near me"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "restaurants around me"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "cooks near me"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "அருகிலுள்ள உணவகங்கள்"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "அருகில் உணவு விற்பனையாளர்கள்"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "nearby_vendors"
+          }
+        ]
+      }
+    ]
+  }

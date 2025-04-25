@@ -1,0 +1,114 @@
+{
+    "id": "00000000-0000-0000-0000-000000000004",
+    "displayName": "Search Food",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "food-item-param",
+        "displayName": "food_item",
+        "required": false,
+        "entityTypeDisplayName": "@food_item"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "I want to eat "
+          },
+          {
+            "text": "biryani",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "find "
+          },
+          {
+            "text": "dosa",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "search for "
+          },
+          {
+            "text": "idli",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "biryani",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "dosa",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "search food"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "பிரியாணி",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "தோசை",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "உணவைத் தேடு"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "look for "
+          },
+          {
+            "text": "parotta",
+            "entityType": "@food_item",
+            "alias": "food_item"
+          }
+        ]
+      }
+    ]
+  }

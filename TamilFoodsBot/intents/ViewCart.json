@@ -1,0 +1,57 @@
+{
+    "id": "00000000-0000-0000-0000-00000000000e",
+    "displayName": "View Cart",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "view cart"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "show my cart"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "what's in my cart"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "check cart"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "view_cart"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "கார்ட் பார்க்க"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "என் கார்ட்"
+          }
+        ]
+      }
+    ]
+  }

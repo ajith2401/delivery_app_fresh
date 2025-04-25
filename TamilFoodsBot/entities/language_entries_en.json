@@ -1,0 +1,19 @@
+[
+    {
+      "value": "english",
+      "synonyms": [
+        "english",
+        "eng",
+        "English language"
+      ]
+    },
+    {
+      "value": "tamil",
+      "synonyms": [
+        "tamil",
+        "தமிழ்",
+        "Tamil language",
+        "tamizh"
+      ]
+    }
+  ]

@@ -1,0 +1,57 @@
+{
+    "id": "00000000-0000-0000-0000-000000000007",
+    "displayName": "Checkout",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "checkout"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "place order"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "complete order"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "proceed to payment"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "confirm order"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "ஆர்டரை உறுதிசெய்"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "செக்அவுட்"
+          }
+        ]
+      }
+    ]
+  }

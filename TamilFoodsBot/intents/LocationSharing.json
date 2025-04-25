@@ -1,0 +1,71 @@
+{
+    "id": "00000000-0000-0000-0000-000000000003",
+    "displayName": "Location Sharing",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "latitude-param",
+        "displayName": "latitude",
+        "required": true,
+        "entityTypeDisplayName": "@sys.number"
+      },
+      {
+        "id": "longitude-param",
+        "displayName": "longitude",
+        "required": true,
+        "entityTypeDisplayName": "@sys.number"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "LOCATION_SHARED"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "here's my location"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "I'm at this location"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "deliver to this address"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "my address"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "இந்த முகவரிக்கு டெலிவரி செய்யுங்கள்"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "இது என் இருப்பிடம்"
+          }
+        ]
+      }
+    ]
+  }

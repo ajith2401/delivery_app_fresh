@@ -1,0 +1,89 @@
+{
+    "id": "00000000-0000-0000-0000-000000000005",
+    "displayName": "Add To Cart",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "item-param",
+        "displayName": "item",
+        "required": true,
+        "entityTypeDisplayName": "@sys.any"
+      },
+      {
+        "id": "quantity-param",
+        "displayName": "quantity",
+        "required": false,
+        "entityTypeDisplayName": "@sys.number",
+        "defaultValue": "1"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "item:"
+          },
+          {
+            "text": "12345",
+            "entityType": "@sys.any",
+            "alias": "item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "add "
+          },
+          {
+            "text": "2",
+            "entityType": "@sys.number",
+            "alias": "quantity"
+          },
+          {
+            "text": " "
+          },
+          {
+            "text": "chicken biryani",
+            "entityType": "@food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "I want "
+          },
+          {
+            "text": "3",
+            "entityType": "@sys.number",
+            "alias": "quantity"
+          },
+          {
+            "text": " "
+          },
+          {
+            "text": "dosas",
+            "entityType": "@food_item"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "add to cart"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "item:60d5fe23b92a1b18c4f832e7",
+            "entityType": "@sys.any",
+            "alias": "item"
+          }
+        ]
+      }
+    ]
+  }

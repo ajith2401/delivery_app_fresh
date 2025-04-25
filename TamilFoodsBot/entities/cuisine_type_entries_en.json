@@ -1,0 +1,39 @@
+[
+    {
+      "value": "Tamil",
+      "synonyms": [
+        "Tamil",
+        "Tamil food",
+        "Tamilian",
+        "South Indian",
+        "தமிழ் உணவு"
+      ]
+    },
+    {
+      "value": "Chettinad",
+      "synonyms": [
+        "Chettinad",
+        "Chettinad cuisine",
+        "Chettiar",
+        "செட்டிநாடு"
+      ]
+    },
+    {
+      "value": "North Indian",
+      "synonyms": [
+        "North Indian",
+        "North India",
+        "Punjabi",
+        "வட இந்திய"
+      ]
+    },
+    {
+      "value": "Chinese",
+      "synonyms": [
+        "Chinese",
+        "Indo-Chinese",
+        "Chindian",
+        "சீன உணவு"
+      ]
+    }
+  ]

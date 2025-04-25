@@ -1,0 +1,79 @@
+{
+    "id": "00000000-0000-0000-0000-00000000000c",
+    "displayName": "Payment Method Selection",
+    "priority": 500000,
+    "webhookState": "WEBHOOK_STATE_ENABLED",
+    "parameters": [
+      {
+        "id": "payment-method-param",
+        "displayName": "payment_method",
+        "required": true,
+        "entityTypeDisplayName": "@payment_method"
+      }
+    ],
+    "trainingPhrases": [
+      {
+        "parts": [
+          {
+            "text": "payment_"
+          },
+          {
+            "text": "online",
+            "entityType": "@payment_method",
+            "alias": "payment_method"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "pay with "
+          },
+          {
+            "text": "cash",
+            "entityType": "@payment_method",
+            "alias": "payment_method"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "i'll use "
+          },
+          {
+            "text": "UPI",
+            "entityType": "@payment_method",
+            "alias": "payment_method"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "payment_cod",
+            "entityType": "@payment_method",
+            "alias": "payment_method"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "payment_online",
+            "entityType": "@payment_method",
+            "alias": "payment_method"
+          }
+        ]
+      },
+      {
+        "parts": [
+          {
+            "text": "payment_upi",
+            "entityType": "@payment_method",
+            "alias": "payment_method"
+          }
+        ]
+      }
+    ]
+  }
