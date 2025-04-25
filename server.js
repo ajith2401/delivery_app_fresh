@@ -1,5 +1,6 @@
 // ==== FILE: server.js ====
 // Main Express server setup
+process.env.DEBUG = 'dialogflow:*';
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
