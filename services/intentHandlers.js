@@ -213,90 +213,112 @@ const intentHandlers = {
     agent.add(new Payload('PLATFORM_UNSPECIFIED', locationPayload));
   },
   
-  // Process location shared by user
-  processLocation: async (agent) => {
-    const phoneNumber = getPhoneNumber(agent);
-    const latitude = agent.parameters.latitude;
-    const longitude = agent.parameters.longitude;
+// Process location shared by user
+processLocation: async (agent) => {
+  const phoneNumber = getPhoneNumber(agent);
+  // Extract location data from the right place
+  let latitude, longitude;
+  
+  try {
+    // Check if there's location data in the original request
+    const originalMessage = agent.request_.body.originalDetectIntentRequest?.payload?.messageText;
     
-    if (!latitude || !longitude) {
-      return agent.add('Please share your location to continue.');
+    if (originalMessage && originalMessage.includes("latitude")) {
+      // Parse the location data from the original message
+      const locationData = JSON.parse(originalMessage);
+      latitude = locationData.latitude;
+      longitude = locationData.longitude;
+    } else {
+      // Check if the location coordinates are directly available in the message
+      const originalDetectIntentRequest = agent.request_.body.originalDetectIntentRequest;
+      if (originalDetectIntentRequest?.payload?.location) {
+        latitude = originalDetectIntentRequest.payload.location.latitude;
+        longitude = originalDetectIntentRequest.payload.location.longitude;
+      }
     }
     
-    // Save location to user profile
-    const user = await User.findOne({ phoneNumber });
-    
-    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-    
-    const newAddress = {
-      label: 'Shared Location',
-      fullAddress: 'Location shared via WhatsApp',
-      location: {
-        type: 'Point',
-        coordinates: [longitude, latitude]
-      }
-    };
-    
-    user.addresses.push(newAddress);
-    user.defaultAddressIndex = user.addresses.length - 1;
-    await user.save();
-    
-    // Show main menu after location is saved
-    const menuText = user.preferredLanguage === 'tamil' ? 
-      'உங்கள் இருப்பிடம் சேமிக்கப்பட்டது! நான் எப்படி உதவ முடியும்?' :
-      'Location saved! How can I help you today?';
-    
-    const optionTexts = user.preferredLanguage === 'tamil' ? 
-      [
-        'அருகிலுள்ள உணவகங்கள்',
-        'உணவைத் தேடு',
-        'எனது ஆர்டர்கள்',
-        'உதவி'
-      ] : 
-      [
-        'Nearby Home Cooks',
-        'Search Food',
-        'My Orders',
-        'Help'
-      ];
-    
-    const menuPayload = {
-      type: 'interactive',
-      interactive: {
-        type: 'button',
-        body: { 
-          text: menuText 
-        },
-        action: {
-          buttons: [
-            {
-              type: 'reply',
-              reply: {
-                id: 'nearby_vendors',
-                title: optionTexts[0]
-              }
-            },
-            {
-              type: 'reply',
-              reply: {
-                id: 'search_food',
-                title: optionTexts[1]
-              }
-            },
-            {
-              type: 'reply',
-              reply: {
-                id: 'my_orders',
-                title: optionTexts[2]
-              }
+    console.log("Extracted location:", { latitude, longitude });
+  } catch (error) {
+    console.error("Error parsing location data:", error);
+  }
+  
+  
+  if (!latitude || !longitude) {
+    return agent.add('Please share your location to continue.');
+  }
+  
+  // Save location to user profile
+  const user = await User.findOne({ phoneNumber });
+  if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+  
+  const newAddress = {
+    label: 'Shared Location',
+    fullAddress: 'Location shared via WhatsApp',
+    location: {
+      type: 'Point',
+      coordinates: [longitude, latitude]
+    }
+  };
+  user.addresses.push(newAddress);
+  user.defaultAddressIndex = user.addresses.length - 1;
+  await user.save();
+  
+  // Show main menu after location is saved
+  const menuText = user.preferredLanguage === 'tamil' ?
+    'உங்கள் இருப்பிடம் சேமிக்கப்பட்டது! நான் எப்படி உதவ முடியும்?' :
+    'Location saved! How can I help you today?';
+  
+  const optionTexts = user.preferredLanguage === 'tamil' ?
+    [
+      'அருகிலுள்ள உணவகங்கள்',
+      'உணவைத் தேடு',
+      'எனது ஆர்டர்கள்',
+      'உதவி'
+    ] :
+    [
+      'Nearby Home Cooks',
+      'Search Food',
+      'My Orders',
+      'Help'
+    ];
+  
+  const menuPayload = {
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: {
+        text: menuText
+      },
+      action: {
+        buttons: [
+          {
+            type: 'reply',
+            reply: {
+              id: 'nearby_vendors',
+              title: optionTexts[0]
             }
-          ]
-        }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'search_food',
+              title: optionTexts[1]
+            }
+          },
+          {
+            type: 'reply',
+            reply: {
+              id: 'my_orders',
+              title: optionTexts[2]
+            }
+          }
+        ]
       }
-    };
-    
-    agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
-  },
+    }
+  };
+  
+  agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
+},
 
   // Search for food items
   searchFood: async (agent) => {

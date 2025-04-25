@@ -85,55 +85,61 @@ const DialogflowService = {
   },
   
   // Process Dialogflow response
-  processDialogflowResponse: (result) => {
-    // Check for webhook payload first
-    if (result.webhookPayload && result.webhookPayload.fields) {
-      const nullPayload = result.webhookPayload.fields.null;
+// Process Dialogflow response
+processDialogflowResponse: (result) => {
+  // Check for webhook payload first
+  if (result.webhookPayload && result.webhookPayload.fields) {
+    const nullPayload = result.webhookPayload.fields.null;
+    if (nullPayload && nullPayload.structValue) {
+      const payloadFields = nullPayload.structValue.fields;
       
-      if (nullPayload && nullPayload.structValue) {
-        const payloadFields = nullPayload.structValue.fields;
+      // Check if it's an interactive payload
+      if (payloadFields.type && payloadFields.type.stringValue === 'interactive' && payloadFields.interactive) {
+        const interactive = payloadFields.interactive.structValue.fields;
+        const buttonType = interactive.type.stringValue;
         
-        // Check if it's an interactive payload
-        if (payloadFields.type && 
-            payloadFields.type.stringValue === 'interactive' && 
-            payloadFields.interactive) {
-          
-          const interactive = payloadFields.interactive.structValue.fields;
-          const buttonType = interactive.type.stringValue;
-          
-          if (buttonType === 'button') {
-            return {
-              type: 'interactive_buttons',
-              text: interactive.body.structValue.fields.text.stringValue,
-              buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
-                id: button.structValue.fields.reply.structValue.fields.id.stringValue,
-                text: button.structValue.fields.reply.structValue.fields.title.stringValue
-              }))
-            };
-          }
+        if (buttonType === 'button') {
+          return {
+            type: 'interactive_buttons',
+            text: interactive.body.structValue.fields.text.stringValue,
+            buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
+              id: button.structValue.fields.reply.structValue.fields.id.stringValue,
+              text: button.structValue.fields.reply.structValue.fields.title.stringValue
+            }))
+          };
+        }
+        
+        // Add location request handling
+        if (buttonType === 'location_request_message') {
+          return {
+            type: 'location_request',
+            text: interactive.body.structValue.fields.text.stringValue,
+            action: interactive.action.structValue.fields.name.stringValue
+          };
         }
       }
     }
-    
-    // Default response as text
-    let response = {
-      type: 'text',
-      text: result.fulfillmentText || 'I didn\'t understand. Can you try again?'
-    };
-
-    // Check for text responses in fulfillment messages
-    const messages = result.fulfillmentMessages || [];
-    const textMessages = messages
-      .filter(msg => msg.message === 'text' && msg.text && msg.text.text && msg.text.text.length > 0)
-      .map(msg => msg.text.text[0])
-      .filter(text => text); // Filter out empty messages
-    
-    if (textMessages.length > 0) {
-      response.text = textMessages.join('\n\n');
-    }
-    
-    return response;
   }
+
+  // Default response as text
+  let response = {
+    type: 'text',
+    text: result.fulfillmentText || 'I didn\'t understand. Can you try again?'
+  };
+
+  // Check for text responses in fulfillment messages
+  const messages = result.fulfillmentMessages || [];
+  const textMessages = messages
+    .filter(msg => msg.message === 'text' && msg.text && msg.text.text && msg.text.text.length > 0)
+    .map(msg => msg.text.text[0])
+    .filter(text => text); // Filter out empty messages
+  
+  if (textMessages.length > 0) {
+    response.text = textMessages.join('\n\n');
+  }
+  
+  return response;
+}
 };
 
 module.exports = DialogflowService;
