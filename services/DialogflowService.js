@@ -13,9 +13,7 @@ const DialogflowService = {
       
       // Set language code based on user preference
       const languageCode = language === 'tamil' ? 'ta' : 'en-US';
-      console.log('detectIntent====================================');
-      console.log({query, messageType});
-      console.log('====================================');
+      
       // Create query parameters
       let queryParams;
       
@@ -32,32 +30,57 @@ const DialogflowService = {
         };
       } else if (messageType === 'location') {
         // Location data is sent as a parameter to a specific intent
-        const location = JSON.parse(query);
-        
+        try {
+          const location = typeof query === 'string' ? JSON.parse(query) : query;
+          
+          queryParams = {
+            session: sessionPath,
+            queryInput: {
+              text: {
+                text: 'LOCATION_SHARED',
+                languageCode: languageCode,
+              },
+            },
+            queryParams: {
+              parameters: {
+                fields: {
+                  latitude: { numberValue: location.latitude },
+                  longitude: { numberValue: location.longitude },
+                }
+              }
+            }
+          };
+        } catch (error) {
+          console.error('Error parsing location data:', error);
+          // Fallback to text intent
+          queryParams = {
+            session: sessionPath,
+            queryInput: {
+              text: {
+                text: 'location error',
+                languageCode: languageCode,
+              },
+            },
+          };
+        }
+      } else if (messageType === 'interactive') {
+        // Handle button click events from WhatsApp
         queryParams = {
           session: sessionPath,
           queryInput: {
             text: {
-              text: 'LOCATION_SHARED',
+              text: query, // The button ID is passed as the query
               languageCode: languageCode,
             },
           },
-          queryParams: {
-            parameters: {
-              fields: {
-                latitude: { numberValue: location.latitude },
-                longitude: { numberValue: location.longitude },
-              }
-            }
-          }
         };
-      } else if (messageType === 'interactive') {
-        // Handle interactive message responses (buttons, lists)
+      } else if (messageType === 'list_selection') {
+        // Handle list selection events from WhatsApp
         queryParams = {
           session: sessionPath,
           queryInput: {
             text: {
-              text: query,
+              text: query, // The list item ID is passed as the query
               languageCode: languageCode,
             },
           },
@@ -67,12 +90,10 @@ const DialogflowService = {
       // Send request to Dialogflow
       const responses = await sessionClient.detectIntent(queryParams);
       console.log('====================================');
-      console.log(JSON.stringify(responses[0].queryResult, null, 2));
+      console.log(responses[0].queryResult);
       console.log('====================================');
       const result = responses[0].queryResult;
-      console.log('result====================================');
-      console.log(result);
-      console.log('====================================');
+      
       // Process the response
       return DialogflowService.processDialogflowResponse(result);
     } catch (error) {
@@ -84,62 +105,62 @@ const DialogflowService = {
     }
   },
   
-  // Process Dialogflow response
-// Process Dialogflow response
-processDialogflowResponse: (result) => {
-  // Check for webhook payload first
-  if (result.webhookPayload && result.webhookPayload.fields) {
-    const nullPayload = result.webhookPayload.fields.null;
-    if (nullPayload && nullPayload.structValue) {
-      const payloadFields = nullPayload.structValue.fields;
-      
-      // Check if it's an interactive payload
-      if (payloadFields.type && payloadFields.type.stringValue === 'interactive' && payloadFields.interactive) {
-        const interactive = payloadFields.interactive.structValue.fields;
-        const buttonType = interactive.type.stringValue;
+  processDialogflowResponse: (result) => {
+    // Extract text from fulfillment messages first
+    let responseText = '';
+    const messages = result.fulfillmentMessages || [];
+    const textMessages = messages
+      .filter(msg => msg.message === 'text' && msg.text && msg.text.text && msg.text.text.length > 0)
+      .map(msg => msg.text.text[0])
+      .filter(text => text); // Filter out empty messages
+    
+    if (textMessages.length > 0) {
+      responseText = textMessages.join('\n\n');
+    } else {
+      // Fallback to fulfillmentText if no text messages
+      responseText = result.fulfillmentText || 'I didn\'t understand. Can you try again?';
+    }
+  
+    // Check for webhook payload
+    if (result.webhookPayload && result.webhookPayload.fields) {
+      const nullPayload = result.webhookPayload.fields.null;
+      if (nullPayload && nullPayload.structValue) {
+        const payloadFields = nullPayload.structValue.fields;
         
-        if (buttonType === 'button') {
-          return {
-            type: 'interactive_buttons',
-            text: interactive.body.structValue.fields.text.stringValue,
-            buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
-              id: button.structValue.fields.reply.structValue.fields.id.stringValue,
-              text: button.structValue.fields.reply.structValue.fields.title.stringValue
-            }))
-          };
-        }
-        
-        // Add location request handling
-        if (buttonType === 'location_request_message') {
-          return {
-            type: 'location_request',
-            text: interactive.body.structValue.fields.text.stringValue,
-            action: interactive.action.structValue.fields.name.stringValue
-          };
+        // Check if it's an interactive payload
+        if (payloadFields.type && payloadFields.type.stringValue === 'interactive' && payloadFields.interactive) {
+          const interactive = payloadFields.interactive.structValue.fields;
+          const buttonType = interactive.type.stringValue;
+          
+          if (buttonType === 'button') {
+            return {
+              type: 'interactive_buttons',
+              text: interactive.body.structValue.fields.text.stringValue,
+              buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
+                id: button.structValue.fields.reply.structValue.fields.id.stringValue,
+                text: button.structValue.fields.reply.structValue.fields.title.stringValue
+              }))
+            };
+          }
+          
+          // Add location request handling
+          if (buttonType === 'location_request_message') {
+            return {
+              type: 'location_request',
+              text: interactive.body.structValue.fields.text.stringValue,
+              action: interactive.action.structValue.fields.name.stringValue
+            };
+          }
         }
       }
     }
+  
+    // Default response as text
+    return {
+      type: 'text',
+      text: responseText
+    };
   }
-
-  // Default response as text
-  let response = {
-    type: 'text',
-    text: result.fulfillmentText || 'I didn\'t understand. Can you try again?'
   };
-
-  // Check for text responses in fulfillment messages
-  const messages = result.fulfillmentMessages || [];
-  const textMessages = messages
-    .filter(msg => msg.message === 'text' && msg.text && msg.text.text && msg.text.text.length > 0)
-    .map(msg => msg.text.text[0])
-    .filter(text => text); // Filter out empty messages
   
-  if (textMessages.length > 0) {
-    response.text = textMessages.join('\n\n');
-  }
-  
-  return response;
-}
-};
-
-module.exports = DialogflowService;
+  module.exports = DialogflowService;

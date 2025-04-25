@@ -2,7 +2,9 @@ const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 const Order = require('../models/Order');
 const PaymentController = require('../controllers/PaymentController');
-const { WebhookClient, Payload } = require('dialogflow-fulfillment');
+const WhatsAppService = require('./WhatsAppService');
+const {WebhookClient, Payload } = require('dialogflow-fulfillment');
+
 
 // Helper function to calculate distance between coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -48,19 +50,18 @@ function getPhoneNumber(agent) {
   }
 }
 
+
 // Handler functions for Dialogflow intents
 const intentHandlers = {
   // Welcome intent handler
   welcome: async (agent) => {
     const phoneNumber = getPhoneNumber(agent);
-    
+    let payload;
     // Find or create user
     let user = await User.findOne({ phoneNumber });
-    console.log({user});
     
     if (!user) {
       user = new User({ phoneNumber });
-      console.log("!user",{phoneNumber});
       await user.save();
       
       // First-time user
@@ -95,8 +96,13 @@ const intentHandlers = {
           }
         }
       };
+      console.log('====================================');
+      console.log('agent,{depth:null}====================================');
+      console.dir(agent, { depth: null });
       
       agent.add(new Payload('PLATFORM_UNSPECIFIED', languagePayload));
+      payload = languagePayload;
+      return languagePayload
     } else {
       // Returning user
       const greeting = user.preferredLanguage === 'tamil' ? 
@@ -124,6 +130,142 @@ const intentHandlers = {
           'Help'
         ];
       
+        const menuPayload = {
+          type: 'interactive',
+          interactive: {
+            type: 'button',
+            body: {
+              text: menuText
+            },
+            action: {
+              buttons: [
+                {
+                  type: 'reply',
+                  reply: {
+                    id: 'nearby_vendors',
+                    title: optionTexts[0]
+                  }
+                },
+                {
+                  type: 'reply',
+                  reply: {
+                    id: 'search_food',
+                    title: optionTexts[1]
+                  }
+                },
+                {
+                  type: 'reply',
+                  reply: {
+                    id: 'my_orders',
+                    title: optionTexts[2]
+                  }
+                },
+                // {
+                //   type: 'reply',
+                //   reply: {
+                //     id: 'help',
+                //     title: optionTexts[3]
+                //   }
+                // }
+              ]
+            }
+          }
+        };
+        payload = menuPayload
+        agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
+        return payload
+    }
+  },
+  
+  // Set language preference
+  setLanguage: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    const language = agent.parameters.language || 'english';
+    
+    // Update user's language preference
+    const user = await User.findOne({ phoneNumber });
+    
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    user.preferredLanguage = language;
+    await user.save();
+    
+    // Confirm language setting
+    const confirmationText = language === 'tamil' ? 
+      'தமிழ் மொழி தேர்ந்தெடுக்கப்பட்டது. 🎉' : 
+      'English language selected. 🎉';
+    
+    agent.add(confirmationText);
+    
+    // Ask for location
+    const locationText = language === 'tamil' ? 
+      'நாங்கள் உங்கள் இருப்பிடத்தைப் பெற்றால், அருகிலுள்ள உணவகங்களைக் காண்பிக்க முடியும். தயவுசெய்து உங்கள் இருப்பிடத்தைப் பகிரவும்:' : 
+      'We can show you nearby home cooks if we have your location. Please share your location:';
+    
+    // Create location request message
+    const locationPayload = {
+      type: 'interactive',
+      interactive: {
+        type: 'location_request_message',
+        body: { 
+          text: locationText 
+        },
+        action: {
+          name: 'send_location'
+        }
+      }
+    };
+    
+    agent.add(new Payload('PLATFORM_UNSPECIFIED', locationPayload));
+  },
+  
+  // Process location shared by user
+  processLocation: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    const latitude = agent.parameters.latitude;
+    const longitude = agent.parameters.longitude;
+    
+    if (!latitude || !longitude) {
+      return agent.add('Please share your location to continue.');
+    }
+    
+    // Save location to user profile
+    const user = await User.findOne({ phoneNumber });
+    
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    const newAddress = {
+      label: 'Shared Location',
+      fullAddress: 'Location shared via WhatsApp',
+      location: {
+        type: 'Point',
+        coordinates: [longitude, latitude]
+      }
+    };
+    
+    user.addresses.push(newAddress);
+    user.defaultAddressIndex = user.addresses.length - 1;
+    await user.save();
+    
+    // Show main menu after location is saved
+    const menuText = user.preferredLanguage === 'tamil' ? 
+      'உங்கள் இருப்பிடம் சேமிக்கப்பட்டது! நான் எப்படி உதவ முடியும்?' :
+      'Location saved! How can I help you today?';
+    
+    const optionTexts = user.preferredLanguage === 'tamil' ? 
+      [
+        'அருகிலுள்ள உணவகங்கள்',
+        'உணவைத் தேடு',
+        'எனது ஆர்டர்கள்',
+        'உதவி'
+      ] : 
+      [
+        'Nearby Home Cooks',
+        'Search Food',
+        'My Orders',
+        'Help'
+      ];
+    
       const menuPayload = {
         type: 'interactive',
         interactive: {
@@ -153,181 +295,21 @@ const intentHandlers = {
                   id: 'my_orders',
                   title: optionTexts[2]
                 }
-              },
-              // {
-              //   type: 'reply',
-              //   reply: {
-              //     id: 'help',
-              //     title: optionTexts[3]
-              //   }
-              // }
+              }
             ]
           }
         }
       };
       
       agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
-    }
-  },
+    },
     
-  
-  // Set language preference
-  setLanguage: async (agent) => {
-    const phoneNumber = getPhoneNumber(agent);
-    const language = agent.parameters.language || 'english';
-    
-    // Update user's language preference
-    const user = await User.findOne({ phoneNumber });
-    
-    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-    
-    user.preferredLanguage = language;
-    await user.save();
-    
-    // Confirm language setting
-    const confirmationText = language === 'tamil' ? 
-      'தமிழ் மொழி தேர்ந்தெடுக்கப்பட்டது. 🎉' : 
-      'English language selected. 🎉';
-    
-    agent.add(confirmationText);
-    
-    // Ask for location
-    const locationText = language === 'tamil' ? 
-      'நாங்கள் உங்கள் இருப்பிடத்தைப் பெற்றால், அருகிலுள்ள உணவகங்களைக் காண்பிக்க முடியும்.' : 
-      'We can show you nearby home cooks if we have your location.';
-    
-    // Create location request message
-    const locationPayload = {
-      type: 'interactive',
-      interactive: {
-        type: 'location_request_message',
-        body: { 
-          text: locationText 
-        },
-        action: {
-          name: 'send_location'
-        }
-      }
-    };
-    
-    agent.add(new Payload('PLATFORM_UNSPECIFIED', locationPayload));
-  },
-  
-// Process location shared by user
-processLocation: async (agent) => {
-  const phoneNumber = getPhoneNumber(agent);
-  // Extract location data from the right place
-  let latitude, longitude;
-  
-  try {
-    // Check if there's location data in the original request
-    const originalMessage = agent.request_.body.originalDetectIntentRequest?.payload?.messageText;
-    
-    if (originalMessage && originalMessage.includes("latitude")) {
-      // Parse the location data from the original message
-      const locationData = JSON.parse(originalMessage);
-      latitude = locationData.latitude;
-      longitude = locationData.longitude;
-    } else {
-      // Check if the location coordinates are directly available in the message
-      const originalDetectIntentRequest = agent.request_.body.originalDetectIntentRequest;
-      if (originalDetectIntentRequest?.payload?.location) {
-        latitude = originalDetectIntentRequest.payload.location.latitude;
-        longitude = originalDetectIntentRequest.payload.location.longitude;
-      }
-    }
-    
-    console.log("Extracted location:", { latitude, longitude });
-  } catch (error) {
-    console.error("Error parsing location data:", error);
-  }
-  
-  
-  if (!latitude || !longitude) {
-    return agent.add('Please share your location to continue.');
-  }
-  
-  // Save location to user profile
-  const user = await User.findOne({ phoneNumber });
-  if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-  
-  const newAddress = {
-    label: 'Shared Location',
-    fullAddress: 'Location shared via WhatsApp',
-    location: {
-      type: 'Point',
-      coordinates: [longitude, latitude]
-    }
-  };
-  user.addresses.push(newAddress);
-  user.defaultAddressIndex = user.addresses.length - 1;
-  await user.save();
-  
-  // Show main menu after location is saved
-  const menuText = user.preferredLanguage === 'tamil' ?
-    'உங்கள் இருப்பிடம் சேமிக்கப்பட்டது! நான் எப்படி உதவ முடியும்?' :
-    'Location saved! How can I help you today?';
-  
-  const optionTexts = user.preferredLanguage === 'tamil' ?
-    [
-      'அருகிலுள்ள உணவகங்கள்',
-      'உணவைத் தேடு',
-      'எனது ஆர்டர்கள்',
-      'உதவி'
-    ] :
-    [
-      'Nearby Home Cooks',
-      'Search Food',
-      'My Orders',
-      'Help'
-    ];
-  
-  const menuPayload = {
-    type: 'interactive',
-    interactive: {
-      type: 'button',
-      body: {
-        text: menuText
-      },
-      action: {
-        buttons: [
-          {
-            type: 'reply',
-            reply: {
-              id: 'nearby_vendors',
-              title: optionTexts[0]
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'search_food',
-              title: optionTexts[1]
-            }
-          },
-          {
-            type: 'reply',
-            reply: {
-              id: 'my_orders',
-              title: optionTexts[2]
-            }
-          }
-        ]
-      }
-    }
-  };
-  
-  agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
-},
-
   // Search for food items
   searchFood: async (agent) => {
-     const phoneNumber = getPhoneNumber(agent);
+    const phoneNumber = getPhoneNumber(agent);
     const foodItem = agent.parameters.food_item;
     
     const user = await User.findOne({ phoneNumber });
-    console.log('searchFood',{user});
-    
     if (!user) return agent.add('Sorry, something went wrong. Please try again.');
     
     // Ensure user has a location
@@ -336,11 +318,12 @@ processLocation: async (agent) => {
         'உங்கள் இருப்பிடத்தைப் பகிர்ந்து கொள்ளுங்கள்:' : 
         'Please share your location first:';
       
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'location_request',
-        text: locationText
-      }));
-      return;
+      return agent.add({
+        payload: {
+          whatsapp_type: 'location_request_message',
+          text: locationText
+        }
+      });
     }
     
     if (!foodItem) {
@@ -394,7 +377,7 @@ processLocation: async (agent) => {
       }
     }
     
-    // Show results with list
+    // Show results
     const resultsText = user.preferredLanguage === 'tamil' ? 
       `நாங்கள் ${vendorItems.length} "${foodItem}" பொருட்களைக் கண்டுபிடித்தோம். ஒன்றைத் தேர்ந்தெடுக்கவும்:` : 
       `We found ${vendorItems.length} "${foodItem}" items. Select one to view details:`;
@@ -402,46 +385,36 @@ processLocation: async (agent) => {
     const buttonText = user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View';
     const sectionTitle = user.preferredLanguage === 'tamil' ? 'கிடைக்கும் உணவு' : 'Available Items';
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'list',
-      text: resultsText,
-      button: buttonText,
-      sectionTitle: sectionTitle,
-      items: vendorItems.slice(0, 10) // WhatsApp limits to 10 items
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'list',
+        text: resultsText,
+        button: buttonText,
+        sectionTitle: sectionTitle,
+        items: vendorItems.slice(0, 10) // WhatsApp limits to 10 items
+      }
+    });
   },
   
   // Browse nearby vendors
   browseNearbyVendors: async (agent) => {
     const phoneNumber = getPhoneNumber(agent);
+    
     const user = await User.findOne({ phoneNumber });
     if (!user) return agent.add('Sorry, something went wrong. Please try again.');
     
     // Ensure user has a location
     if (!user.addresses || user.addresses.length === 0) {
-      const locationText = user.preferredLanguage === 'tamil' ?
-        'உங்கள் இருப்பிடத்தைப் பகிர்ந்து கொள்ளுங்கள்:' :
-        'Please share your current location so we can find nearby home cooks for you.';
+      const locationText = user.preferredLanguage === 'tamil' ? 
+        'உங்கள் இருப்பிடத்தைப் பகிர்ந்து கொள்ளுங்கள்:' : 
+        'Please share your location first:';
       
-      // Updated to use the proper WhatsApp location_request_message format
-      const locationPayload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: phoneNumber,
-        type: "interactive",
-        interactive: {
-          type: "location_request_message",
-          body: {
-            text: locationText
-          },
-          action: {
-            name: "send_location"
-          }
+      return agent.add({
+        payload: {
+          whatsapp_type: 'location_request_message',
+          text: locationText
         }
-      };
-      
-      agent.add(new Payload('PLATFORM_UNSPECIFIED', locationPayload));
-      return;
+      });
     }
     
     // Get user location
@@ -462,9 +435,10 @@ processLocation: async (agent) => {
     }).limit(10);
     
     if (vendors.length === 0) {
-      const noVendorsText = user.preferredLanguage === 'tamil' ?
-        'மன்னிக்கவும், அருகிலுள்ள உணவகங்கள் எதுவும் கிடைக்கவில்லை. பின்னர் மீண்டும் முயற்சிக்கவும்.' :
+      const noVendorsText = user.preferredLanguage === 'tamil' ? 
+        'மன்னிக்கவும், அருகிலுள்ள உணவகங்கள் எதுவும் கிடைக்கவில்லை. பின்னர் மீண்டும் முயற்சிக்கவும்.' : 
         'Sorry, we couldn\'t find any home cooks near you. Please try again later.';
+      
       return agent.add(noVendorsText);
     }
     
@@ -485,49 +459,28 @@ processLocation: async (agent) => {
       };
     });
     
-    // Show results using proper WhatsApp list format
-    const resultsText = user.preferredLanguage === 'tamil' ?
-      `உங்களுக்கு அருகில் ${vendors.length} உணவகங்கள் கண்டுபிடிக்கப்பட்டன. ஒன்றைத் தேர்ந்தெடுக்கவும்:` :
+    // Show results
+    const resultsText = user.preferredLanguage === 'tamil' ? 
+      `உங்களுக்கு அருகில் ${vendors.length} உணவகங்கள் கண்டுபிடிக்கப்பட்டன. ஒன்றைத் தேர்ந்தெடுக்கவும்:` : 
       `We found ${vendors.length} home cooks near you. Select one to view their menu:`;
     
-    const listPayload = {
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to: phoneNumber,
-      type: "interactive",
-      interactive: {
-        type: "list",
-        header: {
-          type: "text",
-          text: user.preferredLanguage === 'tamil' ? "உணவு கடைகள்" : "Home Cooks"
-        },
-        body: {
-          text: resultsText
-        },
-        footer: {
-          text: user.preferredLanguage === 'tamil' ? "தேர்வு செய்யவும்" : "Make a selection"
-        },
-        action: {
-          button: user.preferredLanguage === 'tamil' ? "பார்க்க" : "View",
-          sections: [
-            {
-              title: user.preferredLanguage === 'tamil' ? "அருகிலுள்ள உணவகங்கள்" : "Nearby Home Cooks",
-              rows: vendorList.map(vendor => ({
-                id: vendor.id,
-                title: vendor.title,
-                description: vendor.description
-              }))
-            }
-          ]
-        }
-      }
-    };
+    const buttonText = user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View';
+    const sectionTitle = user.preferredLanguage === 'tamil' ? 'அருகிலுள்ள உணவகங்கள்' : 'Nearby Home Cooks';
     
-    agent.add(new Payload('PLATFORM_UNSPECIFIED', listPayload));
+    agent.add({
+      payload: {
+        whatsapp_type: 'list',
+        text: resultsText,
+        button: buttonText,
+        sectionTitle: sectionTitle,
+        items: vendorList
+      }
+    });
   },
+  
   // Select vendor and show menu
   selectVendor: async (agent) => {
-     const phoneNumber = getPhoneNumber(agent);
+    const phoneNumber = getPhoneNumber(agent);
     const vendorId = agent.parameters.vendor_id;
     
     if (!vendorId) {
@@ -589,18 +542,20 @@ processLocation: async (agent) => {
     const buttonText = user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View';
     const sectionTitle = user.preferredLanguage === 'tamil' ? 'உணவு வகைகள்' : 'Food Categories';
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'list',
-      text: menuText,
-      button: buttonText,
-      sectionTitle: sectionTitle,
-      items: categoriesList
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'list',
+        text: menuText,
+        button: buttonText,
+        sectionTitle: sectionTitle,
+        items: categoriesList
+      }
+    });
   },
   
   // Browse menu items in a category
   browseMenu: async (agent) => {
-     const phoneNumber = getPhoneNumber(agent);
+    const phoneNumber = getPhoneNumber(agent);
     const categoryInput = agent.parameters.category;
     
     if (!categoryInput) {
@@ -651,18 +606,20 @@ processLocation: async (agent) => {
     const buttonText = user.preferredLanguage === 'tamil' ? 'தேர்ந்தெடு' : 'Select';
     const sectionTitle = user.preferredLanguage === 'tamil' ? 'உணவு பொருட்கள்' : 'Menu Items';
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'list',
-      text: menuText,
-      button: buttonText,
-      sectionTitle: sectionTitle,
-      items: itemsList
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'list',
+        text: menuText,
+        button: buttonText,
+        sectionTitle: sectionTitle,
+        items: itemsList
+      }
+    });
   },
   
   // Add item to cart
   addToCart: async (agent) => {
-     const phoneNumber = getPhoneNumber(agent);
+    const phoneNumber = getPhoneNumber(agent);
     const itemInput = agent.parameters.item;
     const quantity = agent.parameters.quantity || 1;
     
@@ -756,20 +713,22 @@ processLocation: async (agent) => {
         'Checkout'
       ];
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'buttons',
-      text: cartText,
-      buttons: [
-        { id: 'add_more', text: optionTexts[0] },
-        { id: 'view_cart', text: optionTexts[1] },
-        { id: 'checkout', text: optionTexts[2] }
-      ]
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: cartText,
+        buttons: [
+          { id: 'add_more', text: optionTexts[0] },
+          { id: 'view_cart', text: optionTexts[1] },
+          { id: 'checkout', text: optionTexts[2] }
+        ]
+      }
+    });
   },
   
   // View cart contents
   viewCart: async (agent) => {
-     const phoneNumber = getPhoneNumber(agent);
+    const phoneNumber = getPhoneNumber(agent);
     
     const user = await User.findOne({ phoneNumber });
     if (!user) return agent.add('Sorry, something went wrong. Please try again.');
@@ -820,20 +779,22 @@ processLocation: async (agent) => {
         'Checkout'
       ];
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'buttons',
-      text: optionsText,
-      buttons: [
-        { id: 'add_more', text: optionTexts[0] },
-        { id: 'clear_cart', text: optionTexts[1] },
-        { id: 'checkout', text: optionTexts[2] }
-      ]
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: optionsText,
+        buttons: [
+          { id: 'add_more', text: optionTexts[0] },
+          { id: 'clear_cart', text: optionTexts[1] },
+          { id: 'checkout', text: optionTexts[2] }
+        ]
+      }
+    });
   },
   
   // Checkout process
   checkout: async (agent) => {
-     const phoneNumber = getPhoneNumber(agent);
+    const phoneNumber = getPhoneNumber(agent);
     
     const user = await User.findOne({ phoneNumber });
     if (!user) return agent.add('Sorry, something went wrong. Please try again.');
@@ -867,11 +828,12 @@ processLocation: async (agent) => {
         'டெலிவரிக்கு உங்கள் இருப்பிடத்தைப் பகிர்ந்து கொள்ளுங்கள்:' : 
         'Please share your location for delivery:';
       
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'location_request',
-        text: noAddressText
-      }));
-      return;
+      return agent.add({
+        payload: {
+          whatsapp_type: 'location_request_message',
+          text: noAddressText
+        }
+      });
     }
     
     const deliveryAddress = user.addresses[user.defaultAddressIndex];
@@ -890,97 +852,140 @@ processLocation: async (agent) => {
         'Share another location'
       ];
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'buttons',
-      text: addressText,
-      buttons: [
-        { id: 'confirm_address', text: confirmTexts[0] },
-        { id: 'new_address', text: confirmTexts[1] }
-      ]
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: addressText,
+        buttons: [
+          { id: 'confirm_address', text: confirmTexts[0] },
+          { id: 'new_address', text: confirmTexts[1] }
+        ]
+      }
+    });
   },
-
-  // Handle payment method selection
-selectPaymentMethod: async (agent) => {
-  const phoneNumber = getPhoneNumber(agent);
-  const paymentMethod = agent.parameters.payment_method;
   
-  const user = await User.findOne({ phoneNumber });
-  if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-  
-  if (!user.cart || !user.cart.vendorId || !user.cart.items || user.cart.items.length === 0) {
-    return agent.add('Please add items to your cart first.');
-  }
-  
-  // Get vendor details
-  const vendor = await Vendor.findById(user.cart.vendorId);
-  if (!vendor) {
-    return agent.add('Sorry, the selected home cook is no longer available.');
-  }
-  
-  // Handle payment method selection
-  let selectedMethod = '';
-  if (paymentMethod) {
-    selectedMethod = paymentMethod;
-  } else {
-    // If no payment method selected, show payment options
-    const paymentText = user.preferredLanguage === 'tamil' ? 
-      'பணம் செலுத்தும் முறையைத் தேர்ந்தெடுக்கவும்:' : 
-      'Please select a payment method:';
+  // Confirm delivery address
+  confirmAddress: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
     
-    const optionTexts = user.preferredLanguage === 'tamil' ? 
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    if (!user.cart || !user.cart.vendorId || !user.cart.items || user.cart.items.length === 0) {
+      return agent.add('Your cart is empty. Please add some items first.');
+    }
+    
+    // At this point, the address is confirmed, ask for payment method
+    const paymentText = user.preferredLanguage === 'tamil' ? 
+      'உங்கள் ஆர்டருக்கு எவ்வாறு பணம் செலுத்த விரும்புகிறீர்கள்?' : 
+      'How would you like to pay for your order?';
+    
+    const paymentOptions = user.preferredLanguage === 'tamil' ? 
       [
-        'பணம்',
-        'ஆன்லைன்',
+        'பணம் கொடுப்பு டெலிவரி',
+        'ஆன்லைன் பணம் செலுத்துதல்',
         'UPI'
       ] : 
       [
         'Cash on Delivery',
-        'Card Payment',
+        'Online Payment',
         'UPI'
       ];
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'buttons',
-      text: paymentText,
-      buttons: [
-        { id: 'payment_COD', text: optionTexts[0] },
-        { id: 'payment_ONLINE', text: optionTexts[1] },
-        { id: 'payment_UPI', text: optionTexts[2] }
-      ]
-    }));
-    return;
-  }
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: paymentText,
+        buttons: [
+          { id: 'payment_COD', text: paymentOptions[0] },
+          { id: 'payment_ONLINE', text: paymentOptions[1] },
+          { id: 'payment_UPI', text: paymentOptions[2] }
+        ]
+      }
+    });
+  },
   
-  // Try to parse from text if still no payment method
-  if (!selectedMethod) {
-    const query = agent.query.toLowerCase();
-    if (query.includes('cod') || query.includes('cash') || query.includes('delivery') || query.includes('1')) {
-      selectedMethod = 'COD';
-    } else if (query.includes('online') || query.includes('card') || query.includes('2')) {
-      selectedMethod = 'ONLINE';
-    } else if (query.includes('upi') || query.includes('gpay') || query.includes('paytm') || query.includes('3')) {
-      selectedMethod = 'UPI';
-    } else {
-      // Default
-      selectedMethod = 'COD';
+  // Select payment method
+  selectPaymentMethod: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    const paymentMethod = agent.parameters.payment_method;
+    
+    if (!paymentMethod) {
+      return agent.add('Please select a payment method to proceed.');
     }
-  }
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    if (!user.cart || !user.cart.vendorId || !user.cart.items || user.cart.items.length === 0) {
+      return agent.add('Your cart is empty. Please add some items first.');
+    }
+    
+    if (!user.addresses || user.addresses.length === 0) {
+      return agent.add('Please provide a delivery address first.');
+    }
+    
+    // Get vendor details
+    const vendor = await Vendor.findById(user.cart.vendorId);
+    if (!vendor) {
+      return agent.add('Sorry, the selected home cook is no longer available.');
+    }
+    
+    // Ask for special instructions (optional)
+    const instructionsText = user.preferredLanguage === 'tamil' ? 
+      'இந்த ஆர்டருக்கு ஏதேனும் சிறப்பு அறிவுறுத்தல்கள் உள்ளதா? (அறிவுறுத்தல்களுடன் பதிலளிக்கவும் அல்லது "இல்லை" என பதிலளிக்கவும்)' : 
+      'Any special instructions for this order? (Reply with instructions or "no")';
+    
+    // Save payment method to session for later use
+    user.conversationState.data.set('paymentMethod', paymentMethod);
+    await user.save();
+    
+    agent.add(instructionsText);
+  },
   
-  // Create order in database
-  try {
+  // Process special instructions and create order
+  processInstructions: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    const instructions = agent.query; // Raw text input from user
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    if (!user.cart || !user.cart.vendorId || !user.cart.items || user.cart.items.length === 0) {
+      return agent.add('Your cart is empty. Please add some items first.');
+    }
+    
+    // Get saved payment method
+    const paymentMethod = user.conversationState.data.get('paymentMethod');
+    if (!paymentMethod) {
+      return agent.add('Please select a payment method first.');
+    }
+    
+    // Get vendor details
+    const vendor = await Vendor.findById(user.cart.vendorId);
+    if (!vendor) {
+      return agent.add('Sorry, the selected home cook is no longer available.');
+    }
+    
+    // Get delivery address
+    const deliveryAddress = user.addresses[user.defaultAddressIndex];
+    
+    // Calculate totals
+    const totalAmount = user.cart.total;
+    const deliveryFee = vendor.deliveryFee;
+    const grandTotal = totalAmount + deliveryFee;
+    
+    // Create new order
     const order = new Order({
       userId: user._id,
       vendorId: vendor._id,
       items: user.cart.items,
-      totalAmount: user.cart.total,
-      deliveryFee: vendor.deliveryFee,
-      grandTotal: user.cart.total + vendor.deliveryFee,
-      deliveryAddress: {
-        fullAddress: user.addresses[user.defaultAddressIndex].fullAddress,
-        location: user.addresses[user.defaultAddressIndex].location
-      },
-      paymentMethod: selectedMethod,
+      totalAmount,
+      deliveryFee,
+      grandTotal,
+      deliveryAddress: deliveryAddress,
+      paymentMethod,
+      specialInstructions: instructions !== 'no' ? instructions : '',
       statusHistory: [{ status: 'PLACED', timestamp: new Date() }]
     });
     
@@ -990,322 +995,515 @@ selectPaymentMethod: async (agent) => {
     user.cart = { items: [], total: 0 };
     await user.save();
     
-    // Send confirmation
-    const confirmationText = user.preferredLanguage === 'tamil' ? 
-      `🎉 ஆர்டர் வெற்றிகரமாக வைக்கப்பட்டது! உங்கள் ஆர்டர் ஐடி: ${order._id}\n\nநன்றி! உங்கள் உணவு விரைவில் வரும்.` : 
-      `🎉 Order successfully placed! Your order ID is: ${order._id}\n\nThank you! Your food will be on the way soon.`;
+    // Send order confirmation
+    await WhatsAppService.sendOrderConfirmation(user.phoneNumber, order);
     
-    agent.add(confirmationText);
-    
-    // Payment instructions based on method
-    if (selectedMethod === 'ONLINE') {
-      const paymentText = user.preferredLanguage === 'tamil' ? 
-        'பணம் செலுத்த இந்த பொத்தானைக் கிளிக் செய்யவும்:' : 
-        'Click this button to make the payment:';
-      
-      const payButtonText = user.preferredLanguage === 'tamil' ? 'இப்போது பணம் செலுத்து' : 'Pay Now';
-      
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'buttons',
-        text: paymentText,
-        buttons: [
-          { id: `pay_order_${order._id}`, text: payButtonText }
-        ]
-      }));
-    } else if (selectedMethod === 'UPI') {
-      const upiText = user.preferredLanguage === 'tamil' ? 
-        'UPI மூலம் பணம் செலுத்த இந்த பொத்தானைக் கிளிக் செய்யவும்:' : 
-        'Click this button to pay via UPI:';
-      
-      const upiButtonText = user.preferredLanguage === 'tamil' ? 'UPI மூலம் பணம் செலுத்து' : 'Pay via UPI';
-      
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'buttons',
-        text: upiText,
-        buttons: [
-          { id: `pay_upi_${order._id}`, text: upiButtonText }
-        ]
-      }));
+    // If online payment, generate payment link
+    if (paymentMethod === 'ONLINE' || paymentMethod === 'UPI') {
+      // Generate payment link using Razorpay
+      try {
+        const paymentData = await PaymentController.createPaymentInternal(order._id);
+        
+        // Send payment link to user
+        await WhatsAppService.sendPaymentLink(
+          user.phoneNumber, 
+          order, 
+          paymentData.paymentLink
+        );
+        
+        const paymentText = user.preferredLanguage === 'tamil' ? 
+          'பணம் செலுத்தும் இணைப்பை உங்களுக்கு அனுப்பியுள்ளோம். உங்கள் ஆர்டர் பணம் செலுத்தப்பட்டதும் செயலாக்கப்படும்.' : 
+          'We\'ve sent you a payment link. Your order will be processed once payment is complete.';
+        
+        agent.add(paymentText);
+      } catch (error) {
+        console.error('Error generating payment link:', error);
+        
+        const errorText = user.preferredLanguage === 'tamil' ? 
+          'பணம் செலுத்தும் இணைப்பை உருவாக்குவதில் சிக்கல் ஏற்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும் அல்லது வேறு பணம் செலுத்தும் முறையைத் தேர்ந்தெடுக்கவும்.' : 
+          'There was an issue generating the payment link. Please try again or choose a different payment method.';
+        
+        agent.add(errorText);
+      }
     } else {
-      // COD option
-      const trackText = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் ஆர்டரை எப்போது வேண்டுமானாலும் பின்தொடரலாம்:' : 
-        'You can track your order at any time:';
+      // For COD, just confirm the order
+      const confirmText = user.preferredLanguage === 'tamil' ? 
+        `உங்கள் ஆர்டர் வெற்றிகரமாக வைக்கப்பட்டது. உங்கள் ஆர்டர் ஐடி: ${order._id}. ஆர்டர் நிலையை அறிய 'எனது ஆர்டர்கள்' என்பதைத் தேர்ந்தெடுக்கவும்.` : 
+        `Your order has been successfully placed. Your order ID is: ${order._id}. Select 'My Orders' to check order status.`;
       
-      const trackButtonText = user.preferredLanguage === 'tamil' ? 'ஆர்டர் நிலையைப் பார்க்க' : 'Check Order Status';
-      
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'buttons',
-        text: trackText,
-        buttons: [
-          { id: `track_order_${order._id}`, text: trackButtonText }
-        ]
-      }));
+      agent.add(confirmText);
     }
+  },
+  
+  // Check order status
+  checkOrderStatus: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    const orderId = agent.parameters.order_id;
     
-  } catch (error) {
-    console.error('Error creating order:', error);
-    agent.add('Sorry, we encountered an error while placing your order. Please try again.');
-  }
-},
-
-// Check order status
-checkOrderStatus: async (agent) => {
-  const phoneNumber = getPhoneNumber(agent);
-  const orderId = agent.parameters.order_id;
-  
-  const user = await User.findOne({ phoneNumber });
-  if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-  
-  try {
-    let order;
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    // If specific order ID is provided
     if (orderId) {
-      order = await Order.findById(orderId).populate('vendorId');
+      const order = await Order.findById(orderId).populate('vendorId', 'businessName');
+      
+      if (!order) {
+        return agent.add('Sorry, we couldn\'t find that order. Please check the order ID and try again.');
+      }
+      
+      if (order.userId.toString() !== user._id.toString()) {
+        return agent.add('This order doesn\'t belong to your account.');
+      }
+      
+      // Format order details
+      const formattedDate = new Date(order.createdAt).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      
+      const statusEmoji = {
+        'PLACED': '🕐',
+        'CONFIRMED': '🍽️',
+        'PREPARING': '👨‍🍳',
+        'OUT_FOR_DELIVERY': '🛵',
+        'DELIVERED': '✅',
+        'CANCELLED': '❌'
+      };
+      
+      let orderDetails = `*Order #${order._id}*\n`;
+      orderDetails += `From: ${order.vendorId.businessName}\n`;
+      orderDetails += `Status: ${statusEmoji[order.orderStatus]} ${order.orderStatus}\n`;
+      orderDetails += `Placed: ${formattedDate}\n\n`;
+      
+      orderDetails += `*Items:*\n`;
+      order.items.forEach(item => {
+        orderDetails += `• ${item.quantity}x ${item.name} - ₹${item.price * item.quantity}\n`;
+      });
+      
+      orderDetails += `\nTotal: ₹${order.grandTotal}\n`;
+      orderDetails += `Payment: ${order.paymentStatus === 'PAID' ? 'PAID' : 'PENDING'} via ${order.paymentMethod}\n`;
+      
+      if (order.estimatedDeliveryTime) {
+        const estimatedTime = new Date(order.estimatedDeliveryTime).toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+        orderDetails += `\nEstimated Delivery: ${estimatedTime}`;
+      }
+      
+      agent.add(orderDetails);
+      
     } else {
-      // Get most recent order
-      order = await Order.findOne({ userId: user._id })
+      // Show list of recent orders
+      const recentOrders = await Order.find({ userId: user._id })
         .sort({ createdAt: -1 })
-        .populate('vendorId');
+        .limit(5)
+        .populate('vendorId', 'businessName');
+      
+      if (recentOrders.length === 0) {
+        const noOrdersText = user.preferredLanguage === 'tamil' ? 
+          'உங்களிடம் முந்தைய ஆர்டர்கள் எதுவும் இல்லை.' : 
+          'You don\'t have any previous orders.';
+        
+        return agent.add(noOrdersText);
+      }
+      
+      const statusEmoji = {
+        'PLACED': '🕐',
+        'CONFIRMED': '🍽️',
+        'PREPARING': '👨‍🍳',
+        'OUT_FOR_DELIVERY': '🛵',
+        'DELIVERED': '✅',
+        'CANCELLED': '❌'
+      };
+      
+      let orderListText = user.preferredLanguage === 'tamil' ? 
+        'உங்கள் சமீபத்திய ஆர்டர்கள்:' : 
+        'Here are your recent orders:';
+      
+      const orderItems = recentOrders.map(order => {
+        const timeAgo = getTimeAgo(order.createdAt, user.preferredLanguage);
+        
+        return {
+          id: `order:${order._id}`,
+          title: `Order #${order._id.toString().substring(order._id.toString().length - 6)} - ${order.vendorId.businessName}`,
+          description: `${statusEmoji[order.orderStatus]} ${order.orderStatus} (${timeAgo})`
+        };
+      });
+      
+      const buttonText = user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View';
+      const sectionTitle = user.preferredLanguage === 'tamil' ? 'எனது ஆர்டர்கள்' : 'My Orders';
+      
+      agent.add({
+        payload: {
+          whatsapp_type: 'list',
+          text: orderListText,
+          button: buttonText,
+          sectionTitle: sectionTitle,
+          items: orderItems
+        }
+      });
+    }
+  },
+  
+  // View order history
+  viewOrderHistory: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    // Same implementation as checkOrderStatus without order_id
+    // Show list of recent orders
+    const recentOrders = await Order.find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('vendorId', 'businessName');
+    
+    if (recentOrders.length === 0) {
+      const noOrdersText = user.preferredLanguage === 'tamil' ? 
+        'உங்களிடம் முந்தைய ஆர்டர்கள் எதுவும் இல்லை.' : 
+        'You don\'t have any previous orders.';
+      
+      return agent.add(noOrdersText);
     }
     
-    if (!order) {
-      const noOrderText = user.preferredLanguage === 'tamil' ? 
-        'ஆர்டர்கள் எதுவும் கிடைக்கவில்லை. புதிய ஆர்டரை வைக்க விரும்புகிறீர்களா?' : 
-        'No orders found. Would you like to place a new order?';
-      
-      const optionTexts = user.preferredLanguage === 'tamil' ? 
-        [
-          'புதிய ஆர்டர்',
-          'மீண்டும் முயற்சி'
-        ] : 
-        [
-          'New Order',
-          'Try Again'
-        ];
-      
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'buttons',
-        text: noOrderText,
-        buttons: [
-          { id: 'nearby_vendors', text: optionTexts[0] },
-          { id: 'check_order_status', text: optionTexts[1] }
-        ]
-      }));
-      return;
-    }
-    
-    // Format order status with emoji indicators
     const statusEmoji = {
-      'PLACED': '📝',
-      'CONFIRMED': '✅',
+      'PLACED': '🕐',
+      'CONFIRMED': '🍽️',
       'PREPARING': '👨‍🍳',
       'OUT_FOR_DELIVERY': '🛵',
-      'DELIVERED': '🎁',
+      'DELIVERED': '✅',
       'CANCELLED': '❌'
     };
     
-    const emoji = statusEmoji[order.orderStatus] || '📋';
+    let orderListText = user.preferredLanguage === 'tamil' ? 
+      'உங்கள் சமீபத்திய ஆர்டர்கள்:' : 
+      'Here are your recent orders:';
     
-    const statusText = user.preferredLanguage === 'tamil' ? 
-      `*ஆர்டர் நிலை* ${emoji}\nஆர்டர் ஐடி: ${order._id}\nஉணவகம்: ${order.vendorId.businessName}\nநிலை: ${order.orderStatus}\nமொத்தம்: ₹${order.grandTotal}` : 
-      `*Order Status* ${emoji}\nOrder ID: ${order._id}\nVendor: ${order.vendorId.businessName}\nStatus: ${order.orderStatus}\nTotal: ₹${order.grandTotal}`;
-    
-    agent.add(statusText);
-    
-    // Additional information based on status
-    let additionalInfo = '';
-    if (order.orderStatus === 'PLACED') {
-      additionalInfo = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் ஆர்டர் வைக்கப்பட்டுள்ளது மற்றும் விற்பனையாளரிடமிருந்து உறுதிப்படுத்தலுக்காக காத்திருக்கிறது.' : 
-        'Your order has been placed and is waiting for confirmation from the vendor.';
-    } else if (order.orderStatus === 'CONFIRMED') {
-      additionalInfo = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் ஆர்டர் உறுதிசெய்யப்பட்டது மற்றும் தயாரிக்கப்படுகிறது.' : 
-        'Your order has been confirmed and is being prepared.';
-    } else if (order.orderStatus === 'PREPARING') {
-      additionalInfo = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் உணவு தயாரிக்கப்பட்டு விரைவில் டெலிவரிக்கு தயாராக இருக்கும்.' : 
-        'Your food is being prepared and will be ready for delivery soon.';
-    } else if (order.orderStatus === 'OUT_FOR_DELIVERY') {
-      additionalInfo = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் உணவு வழியில் உள்ளது! இது விரைவில் உங்களை அடையும்.' : 
-        'Your food is on the way! It should reach you shortly.';
-    } else if (order.orderStatus === 'DELIVERED') {
-      additionalInfo = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் ஆர்டர் டெலிவரி செய்யப்பட்டது. உங்கள் உணவை அனுபவிக்கவும்!' : 
-        'Your order has been delivered. Enjoy your meal!';
-    } else if (order.orderStatus === 'CANCELLED') {
-      additionalInfo = user.preferredLanguage === 'tamil' ? 
-        'உங்கள் ஆர்டர் ரத்து செய்யப்பட்டது. உதவி தேவைப்பட்டால் ஆதரவைத் தொடர்பு கொள்ளவும்.' : 
-        'Your order was cancelled. Please contact support if you need assistance.';
-    }
-    
-    agent.add(additionalInfo);
-    
-    // Add track/reorder options
-    const optionsText = user.preferredLanguage === 'tamil' ? 
-      'என்ன செய்ய விரும்புகிறீர்கள்?' : 
-      'What would you like to do?';
-    
-    const optionTexts = user.preferredLanguage === 'tamil' ? 
-      [
-        'மீண்டும் ஆர்டர்',
-        'புதிய ஆர்டர்'
-      ] : 
-      [
-        'Reorder',
-        'New Order'
-      ];
-    
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'buttons',
-      text: optionsText,
-      buttons: [
-        { id: `reorder_${order._id}`, text: optionTexts[0] },
-        { id: 'nearby_vendors', text: optionTexts[1] }
-      ]
-    }));
-    
-  } catch (error) {
-    console.error('Error checking order status:', error);
-    agent.add('Sorry, we encountered an error while checking your order status. Please try again.');
-  }
-},
-
-// View order history
-viewOrderHistory: async (agent) => {
-  const phoneNumber = getPhoneNumber(agent);
-  
-  const user = await User.findOne({ phoneNumber });
-  if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-  
-  try {
-    // Get recent orders
-    const orders = await Order.find({ userId: user._id })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate('vendorId');
-    
-    if (!orders || orders.length === 0) {
-      const noOrdersText = user.preferredLanguage === 'tamil' ? 
-        'உங்களிடம் முந்தைய ஆர்டர்கள் எதுவும் இல்லை. புதிய ஆர்டரை வைக்க விரும்புகிறீர்களா?' : 
-        'You have no previous orders. Would you like to place a new order?';
+    const orderItems = recentOrders.map(order => {
+      const timeAgo = getTimeAgo(order.createdAt, user.preferredLanguage);
       
-      agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-        whatsapp_type: 'buttons',
-        text: noOrdersText,
-        buttons: [
-          { id: 'nearby_vendors', text: user.preferredLanguage === 'tamil' ? 'புதிய ஆர்டர்' : 'New Order' }
-        ]
-      }));
-      return;
-    }
-    
-    // Format order history
-    const historyText = user.preferredLanguage === 'tamil' ? 
-      `*முந்தைய ஆர்டர்கள்*\nஉங்கள் சமீபத்திய ${orders.length} ஆர்டர்கள்:` : 
-      `*Previous Orders*\nYour most recent ${orders.length} orders:`;
-    
-    agent.add(historyText);
-    
-    // Add each order details
-    let orderDetails = '';
-    orders.forEach((order, index) => {
-      const orderDate = new Date(order.createdAt).toLocaleDateString();
-      orderDetails += `${index + 1}. ${orderDate} - ${order.vendorId.businessName}\n`;
-      orderDetails += `   Status: ${order.orderStatus} - ₹${order.grandTotal}\n`;
-      orderDetails += `   Order ID: ${order._id}\n\n`;
-    });
-    
-    agent.add(orderDetails);
-    
-    // Create a list of orders that can be selected
-    const orderItems = orders.map(order => {
-      const orderDate = new Date(order.createdAt).toLocaleDateString();
       return {
-        id: `order_${order._id}`,
-        title: `${orderDate} - ${order.vendorId.businessName}`,
-        description: `${order.orderStatus} - ₹${order.grandTotal}`
+        id: `order:${order._id}`,
+        title: `Order #${order._id.toString().substring(order._id.toString().length - 6)} - ${order.vendorId.businessName}`,
+        description: `${statusEmoji[order.orderStatus]} ${order.orderStatus} (${timeAgo})`
       };
     });
     
-    const viewDetailsText = user.preferredLanguage === 'tamil' ? 
-      'விவரங்களைப் பார்க்க ஆர்டரைத் தேர்ந்தெடுக்கவும்:' : 
-      'Select an order to view details:';
+    const buttonText = user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View';
+    const sectionTitle = user.preferredLanguage === 'tamil' ? 'எனது ஆர்டர்கள்' : 'My Orders';
     
-    agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-      whatsapp_type: 'list',
-      text: viewDetailsText,
-      button: user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View',
-      sectionTitle: user.preferredLanguage === 'tamil' ? 'முந்தைய ஆர்டர்கள்' : 'Previous Orders',
-      items: orderItems
-    }));
+    agent.add({
+      payload: {
+        whatsapp_type: 'list',
+        text: orderListText,
+        button: buttonText,
+        sectionTitle: sectionTitle,
+        items: orderItems
+      }
+    });
+  },
+  
+  // Help menu
+  help: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
     
-  } catch (error) {
-    console.error('Error fetching order history:', error);
-    agent.add('Sorry, we encountered an error while fetching your order history. Please try again.');
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    const helpMenuText = user.preferredLanguage === 'tamil' ? 
+      'நான் எவ்வாறு உதவ முடியும்?' : 
+      'How can I help you today?';
+    
+    const helpOptions = user.preferredLanguage === 'tamil' ? 
+      [
+        'எப்படி ஆர்டர் செய்வது',
+        'பணம் செலுத்தும் விருப்பங்கள்',
+        'டெலிவரி பகுதிகள்',
+        'ஆதரவு தொடர்பு கொள்ளவும்'
+      ] : 
+      [
+        'How to Order',
+        'Payment Options',
+        'Delivery Areas',
+        'Contact Support'
+      ];
+    
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: helpMenuText,
+        buttons: [
+          { id: 'help_ordering', text: helpOptions[0] },
+          { id: 'help_payment', text: helpOptions[1] },
+          { id: 'help_delivery', text: helpOptions[2] }
+        ]
+      }
+    });
+  },
+  
+  // Help with ordering
+  helpOrdering: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    const orderingGuide = user.preferredLanguage === 'tamil' ? 
+      `*எப்படி ஆர்டர் செய்வது:*
+1. உங்கள் இருப்பிடத்தைப் பகிரவும் அல்லது உணவைத் தேடவும்
+2. அருகிலுள்ள சமையல்காரர்கள் அல்லது உணவு பொருட்களை உலாவவும்
+3. பொருட்களைத் தேர்ந்தெடுத்து கார்ட்டில் சேர்க்கவும்
+4. செக்அவுட் செய்து பணம் செலுத்தும் முறையைத் தேர்ந்தெடுக்கவும்
+5. உங்கள் ஆர்டர் நிலையை நிகழ்நேரத்தில் கண்காணிக்கவும்
+
+மேலும் உதவி தேவையா?` : 
+      `*How to Order:*
+1. Share your location or search for food
+2. Browse nearby home cooks or food items
+3. Select items and add to cart
+4. Checkout and select payment method
+5. Track your order status in real-time
+
+Need more help?`;
+    
+    agent.add(orderingGuide);
+    
+    const buttonTexts = user.preferredLanguage === 'tamil' ? 
+      [
+        'மெனுவுக்குத் திரும்பு',
+        'ஆதரவை தொடர்பு கொள்ளவும்'
+      ] : 
+      [
+        'Back to Menu',
+        'Contact Support'
+      ];
+    
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: 'Need more help?',
+        buttons: [
+          { id: 'back_to_menu', text: buttonTexts[0] },
+          { id: 'contact_support', text: buttonTexts[1] }
+        ]
+      }
+    });
+  },
+  
+  // Help with payment options
+  helpPayment: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    const paymentGuide = user.preferredLanguage === 'tamil' ? 
+      `*பணம் செலுத்தும் விருப்பங்கள்:*
+1. பணம் கொடுப்பு டெலிவரி - உணவு டெலிவரியின் போது பணம் செலுத்தவும்
+2. ஆன்லைன் பணம் செலுத்துதல் - கிரெடிட்/டெபிட் கார்டுகள், நெட்பேங்கிங் மூலம்
+3. UPI - Google Pay, PhonePe, BHIM போன்ற UPI பயன்பாடுகள் மூலம்
+
+ஆன்லைன் பணம் செலுத்துதல் அல்லது UPI ஐத் தேர்ந்தெடுக்கும்போது, உங்களுக்கு ஒரு பணம் செலுத்தும் இணைப்பு அனுப்பப்படும்.` : 
+      `*Payment Options:*
+1. Cash on Delivery - Pay with cash upon delivery
+2. Online Payment - Pay using credit/debit cards, netbanking
+3. UPI - Pay using UPI apps like Google Pay, PhonePe, BHIM
+
+When selecting Online Payment or UPI, a payment link will be sent to you.`;
+    
+    agent.add(paymentGuide);
+    
+    const buttonTexts = user.preferredLanguage === 'tamil' ? 
+      [
+        'மெனுவுக்குத் திரும்பு',
+        'ஆதரவை தொடர்பு கொள்ளவும்'
+      ] : 
+      [
+        'Back to Menu',
+        'Contact Support'
+      ];
+    
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: 'Need more help?',
+        buttons: [
+          { id: 'back_to_menu', text: buttonTexts[0] },
+          { id: 'contact_support', text: buttonTexts[1] }
+        ]
+      }
+    });
+  },
+  
+  // Help with delivery areas
+  helpDelivery: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    const deliveryGuide = user.preferredLanguage === 'tamil' ? 
+      `*டெலிவரி தகவல்:*
+- டெலிவரி பகுதிகள்: நாங்கள் பொதுவாக உங்கள் இருப்பிடத்திலிருந்து 5 கி.மீ தூரத்திற்குள் உள்ள சமையல்காரர்களை காட்டுகிறோம்
+- டெலிவரி நேரம்: சராசரியாக 45-60 நிமிடங்கள் (இடம் மற்றும் ஆர்டரைப் பொறுத்து மாறலாம்)
+- டெலிவரி கட்டணம்: ஒவ்வொரு சமையல்காரருக்கும் வேறுபடுகிறது, பொதுவாக ₹30-50 இடையே
+
+ஆர்டர் வைக்கப்பட்டதும், டெலிவரி நிலை தொடர்பான புதுப்பிப்புகளுக்கு WhatsApp அறிவிப்புகளைப் பெறுவீர்கள்.` : 
+      `*Delivery Information:*
+- Delivery Areas: We typically show home cooks within 5 km of your location
+- Delivery Time: Average 45-60 minutes (may vary depending on location and order)
+- Delivery Fee: Varies by home cook, typically between ₹30-50
+
+Once your order is placed, you'll receive WhatsApp notifications for delivery status updates.`;
+    
+    agent.add(deliveryGuide);
+    
+    const buttonTexts = user.preferredLanguage === 'tamil' ? 
+      [
+        'மெனுவுக்குத் திரும்பு',
+        'ஆதரவை தொடர்பு கொள்ளவும்'
+      ] : 
+      [
+        'Back to Menu',
+        'Contact Support'
+      ];
+    
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: 'Need more help?',
+        buttons: [
+          { id: 'back_to_menu', text: buttonTexts[0] },
+          { id: 'contact_support', text: buttonTexts[1] }
+        ]
+      }
+    });
+  },
+  
+  // Contact support
+  contactSupport: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    const supportText = user.preferredLanguage === 'tamil' ? 
+      `*ஆதரவு தொடர்பு:*
+ஏதேனும் பிரச்சனைகள் அல்லது கேள்விகளுக்கு, எங்கள் ஆதரவு குழுவைத் தொடர்பு கொள்ளவும்:
+
+📞 ஆதரவு எண்: +91 98765 43210
+✉️ மின்னஞ்சல்: support@tamilfoods.com
+
+ஆதரவு நேரங்கள்: காலை 9 மணி முதல் இரவு 9 மணி வரை, வாரத்தின் 7 நாட்களும்` : 
+      `*Contact Support:*
+For any issues or questions, contact our support team:
+
+📞 Support Number: +91 98765 43210
+✉️ Email: support@tamilfoods.com
+
+Support Hours: 9 AM to 9 PM, 7 days a week`;
+    
+    agent.add(supportText);
+    
+    const backText = user.preferredLanguage === 'tamil' ? 'மெனுவுக்குத் திரும்பு' : 'Back to Menu';
+    
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: 'Can I help you with anything else?',
+        buttons: [
+          { id: 'back_to_menu', text: backText }
+        ]
+      }
+    });
+  },
+  
+  // Return to main menu
+  backToMenu: async (agent) => {
+    const phoneNumber = getPhoneNumber(agent);
+    
+    const user = await User.findOne({ phoneNumber });
+    if (!user) return agent.add('Sorry, something went wrong. Please try again.');
+    
+    // Show main menu
+    const menuText = user.preferredLanguage === 'tamil' ? 
+      'நான் எப்படி உதவ முடியும்?' :
+      'How can I help you today?';
+    
+    const optionTexts = user.preferredLanguage === 'tamil' ? 
+      [
+        'அருகிலுள்ள உணவகங்கள்',
+        'உணவைத் தேடு',
+        'எனது ஆர்டர்கள்',
+        'உதவி'
+      ] : 
+      [
+        'Nearby Home Cooks',
+        'Search Food',
+        'My Orders',
+        'Help'
+      ];
+    
+    agent.add({
+      payload: {
+        whatsapp_type: 'buttons',
+        text: menuText,
+        buttons: [
+          { id: 'nearby_vendors', text: optionTexts[0] },
+          { id: 'search_food', text: optionTexts[1] },
+          { id: 'my_orders', text: optionTexts[2] }
+        ]
+      }
+    });
   }
-},
+};
 
-// Help intent
-help: async (agent) => {
-  const phoneNumber = getPhoneNumber(agent);
-  
-  // Get user for language preference
-  const user = await User.findOne({ phoneNumber }).catch(() => null);
-  const language = user?.preferredLanguage || 'english';
-  
-  const helpText = language === 'tamil' ? 
-    '*TamilFoods உதவி*\n\nஇது ஒரு உணவு டெலிவரி பாட். நீங்கள் பின்வரும் செயல்களைச் செய்யலாம்:' : 
-    '*TamilFoods Help*\n\nThis is a food delivery bot. You can perform the following actions:';
-  
-  agent.add(helpText);
-  
-  const commands = language === 'tamil' ? 
-    [
-      '1. அருகிலுள்ள உணவகங்கள் - உங்கள் அருகிலுள்ள உணவகங்களைக் காட்டும்',
-      '2. உணவைத் தேடு - குறிப்பிட்ட உணவைத் தேடும்',
-      '3. எனது ஆர்டர்கள் - முந்தைய ஆர்டர்களைக் காட்டும்',
-      '4. ஆர்டர் நிலை - உங்கள் தற்போதைய ஆர்டரின் நிலையைச் சரிபார்க்கும்'
-    ] : 
-    [
-      '1. Nearby Home Cooks - Shows home cooks near your location',
-      '2. Search Food - Search for specific food items',
-      '3. My Orders - View your previous orders',
-      '4. Order Status - Check the status of your current order'
-    ];
-  
-  // Add all commands as a single message to avoid cluttering the chat
-  agent.add(commands.join('\n'));
-  
-  // Provide options buttons
-  const optionsText = language === 'tamil' ? 
-    'என்ன செய்ய விரும்புகிறீர்கள்?' : 
-    'What would you like to do?';
-  
-  const optionTexts = language === 'tamil' ? 
-    [
-      'அருகிலுள்ள உணவகங்கள்',
-      'உணவைத் தேடு',
-      'எனது ஆர்டர்கள்'
-    ] : 
-    [
-      'Nearby Home Cooks',
-      'Search Food',
-      'My Orders'
-    ];
-  
-  agent.add(new agent.Payload('PLATFORM_UNSPECIFIED', {
-    whatsapp_type: 'buttons',
-    text: optionsText,
-    buttons: [
-      { id: 'nearby_vendors', text: optionTexts[0] },
-      { id: 'search_food', text: optionTexts[1] },
-      { id: 'my_orders', text: optionTexts[2] }
-    ]
-  }));
+// Helper function to calculate distance between coordinates
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in km
+  return distance;
 }
 
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
 }
 
-module.exports  = intentHandlers
+// Helper function to format time ago
+function getTimeAgo(timestamp, language) {
+  const now = new Date();
+  const diff = now - new Date(timestamp);
+  
+  // Convert diff to minutes, hours, days
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (language === 'tamil') {
+    if (minutes < 1) return 'இப்போது';
+    if (minutes < 60) return `${minutes} நிமிடங்களுக்கு முன்`;
+    if (hours < 24) return `${hours} மணிநேரத்திற்கு முன்`;
+    return `${days} நாட்களுக்கு முன்`;
+  } else {
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} mins ago`;
+    if (hours < 24) return `${hours} hours ago`;
+    return `${days} days ago`;
+  }
+}
+
+module.exports = intentHandlers;

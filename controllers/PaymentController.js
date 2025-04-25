@@ -6,10 +6,6 @@ const User = require('../models/User');
 const WhatsAppService = require('../services/WhatsAppService');
 const dotenv = require('dotenv');
 dotenv.config();
-console.log('====================================');
-console.log( process.env.RAZORPAY_KEY_ID);
-console.log('====================================');
-
 // Initialize Razorpay
 const razorpay = new Razorpay({
 key_id: process.env.RAZORPAY_KEY_ID,

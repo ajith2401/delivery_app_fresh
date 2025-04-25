@@ -1,7 +1,9 @@
 // ==== FILE: controllers/WhatsAppController.js ====
-const axios = require('axios');
 const User = require('../models/User');
 const DialogflowService = require('../services/DialogflowService');
+const WhatsAppMessageHelpers = require('../services/WhatsAppMessageHelpers');
+const WhatsAppService = require('../services/WhatsAppService');
+const ErrorHandler = require('../services/ErrorHandler');
 
 const WhatsAppController = {
   // Verify webhook for WhatsApp Business API
@@ -16,6 +18,7 @@ const WhatsAppController = {
         return res.status(200).send(challenge);
       }
     }
+    
     res.sendStatus(403);
   },
   
@@ -47,22 +50,19 @@ const WhatsAppController = {
         }
       }
     } catch (error) {
-      console.error('Error handling WhatsApp message:', error);
+      ErrorHandler.logError('handleIncomingMessage', error);
     }
   },
   
   // Process different types of messages
   processMessage: async (phoneNumber, message) => {
     try {
-      console.log('====================================');
-      console.log("Incoming message:", JSON.stringify(message, null, 2));
-      console.log('====================================');
-
       // Find or create user
       let user = await User.findOne({ phoneNumber });
       if (!user) {
         user = new User({ phoneNumber });
         await user.save();
+        console.log(`Created new user for phone number: ${phoneNumber}`);
       }
       
       // Update last interaction time
@@ -71,12 +71,11 @@ const WhatsAppController = {
       
       let messageText = '';
       let messageType = 'text';
-      console.log('====================================');
-      console.log("message.type",message.type);
-      console.log('====================================');
+      
       // Extract message content based on type
       if (message.type === 'text') {
         messageText = message.text.body;
+        console.log(`Received text message from ${phoneNumber}: "${messageText}"`);
       } else if (message.type === 'location') {
         messageType = 'location';
         messageText = JSON.stringify({
@@ -84,176 +83,138 @@ const WhatsAppController = {
           longitude: message.location.longitude
         });
         
-        // Save location to user profile
-        const newAddress = {
-          label: 'Shared Location',
-          fullAddress: 'Location shared via WhatsApp',
-          location: {
-            type: 'Point',
-            coordinates: [message.location.longitude, message.location.latitude]
-          }
-        };
+        console.log(`Received location from ${phoneNumber}: (${message.location.latitude}, ${message.location.longitude})`);
         
-        user.addresses.push(newAddress);
-        user.defaultAddressIndex = user.addresses.length - 1;
-        await user.save();
+        // Save location to user profile if available
+        if (message.location.latitude && message.location.longitude) {
+          const newAddress = {
+            label: 'Shared Location',
+            fullAddress: message.location.address || 'Location shared via WhatsApp',
+            location: {
+              type: 'Point',
+              coordinates: [message.location.longitude, message.location.latitude]
+            }
+          };
+          
+          user.addresses.push(newAddress);
+          user.defaultAddressIndex = user.addresses.length - 1;
+          await user.save();
+          console.log(`Saved location to user profile: ${phoneNumber}`);
+        }
       } else if (message.type === 'interactive') {
-        messageType = 'interactive';
         if (message.interactive.type === 'button_reply') {
+          messageType = 'button';
           messageText = message.interactive.button_reply.id;
+          
+          console.log(`User ${phoneNumber} clicked button: ${messageText} (${message.interactive.button_reply.title})`);
         } else if (message.interactive.type === 'list_reply') {
+          messageType = 'list_selection';
           messageText = message.interactive.list_reply.id;
+          
+          console.log(`User ${phoneNumber} selected list item: ${messageText} (${message.interactive.list_reply.title})`);
         }
       } else {
         // For unsupported message types
         messageText = `[${message.type} message received]`;
+        console.log(`Received unsupported message type: ${message.type} from ${phoneNumber}`);
       }
-      console.log('====================================');
-      console.log({messageText});
-      console.log('====================================');
+      
       // Process message through Dialogflow
+      console.log(`Sending to Dialogflow: "${messageText}" (type: ${messageType})`);
       const dialogflowResponse = await DialogflowService.detectIntent(
         process.env.DIALOGFLOW_PROJECT_ID,
         phoneNumber,
         messageText,
         messageType,
-        user.preferredLanguage
+        user.preferredLanguage || 'english'
       );
-      
-      console.log('====================================');
-      console.log("Dialogflow Response:", JSON.stringify(dialogflowResponse, null, 2));
-      console.log('====================================');
 
+      console.log({dialogflowResponse});
+      
+      
       // Send response back to WhatsApp
       await WhatsAppController.sendWhatsAppMessage(phoneNumber, dialogflowResponse);
-      
     } catch (error) {
-      console.error('Error processing message:', error);
+      ErrorHandler.logError('processMessage', error);
     }
   },
   
   // Send message to WhatsApp
-// Add a new message type handler in sendWhatsAppMessage function
-sendWhatsAppMessage: async (phoneNumber, dialogflowResponse) => {
-  try {
-    const url = `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
-    
-    // Handle different message types from Dialogflow
-    let messagePayload;
-    console.log('====================================');
-    console.log("dialogflowResponse.type",dialogflowResponse.type);
-    console.log('====================================');
-    if (dialogflowResponse.type === 'text') {
-      // Simple text message
-      messagePayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual', 
-        to: phoneNumber,
-        type: 'text',
-        text: { 
-          preview_url: false,
-          body: dialogflowResponse.text 
-        }
-      };
-    } else if (dialogflowResponse.type === 'interactive_buttons') {
-      // Interactive buttons message
-      messagePayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: phoneNumber,
-        type: 'interactive',
-        interactive: {
-          type: 'button',
-          body: { 
-            text: dialogflowResponse.text 
-          },
-          action: {
-            buttons: dialogflowResponse.buttons.map((button, index) => ({
-              type: 'reply',
-              reply: {
-                id: button.id || `btn_${index}`,
-                title: button.text
-              }
-            }))
-          }
-        }
-      };
-    } else if (dialogflowResponse.type === 'interactive_list') {
-      // Interactive list message
-      messagePayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: phoneNumber,
-        type: 'interactive',
-        interactive: {
-          type: 'list',
-          header: dialogflowResponse.header ? {
-            type: 'text',
-            text: dialogflowResponse.header
-          } : undefined,
-          body: { 
-            text: dialogflowResponse.text 
-          },
-          footer: dialogflowResponse.footer ? {
-            text: dialogflowResponse.footer
-          } : undefined,
-          action: {
-            button: dialogflowResponse.button || "Select",
-            sections: dialogflowResponse.sections || []
-          }
-        }
-      };
-    } else if (dialogflowResponse.type === 'location_request') {
-      // Location request message
-      messagePayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: phoneNumber,
-        type: 'interactive',
-        interactive: {
-          type: 'location_request_message',
-          body: { 
-            text: dialogflowResponse.text 
-          },
-          action: {
-            name: 'send_location'
-          }
-        }
-      };
-    } else {
-      // Default to text if type is not recognized
-      messagePayload = {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: phoneNumber,
-        type: 'text',
-        text: { 
-          preview_url: false,
-          body: typeof dialogflowResponse.text === 'string' ? 
-            dialogflowResponse.text : 'Sorry, I couldn\'t process that request.' 
-        }
-      };
-    }
-    
-    console.log('====================================');
-    console.log("Sending WhatsApp Payload:", JSON.stringify(messagePayload, null, 2));
-    console.log('====================================');
-
-    // Send message via WhatsApp Business API
-    await axios.post(url, messagePayload, {
-      headers: {
-        'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json'
+  sendWhatsAppMessage: async (phoneNumber, dialogflowResponse) => {
+    try {
+      if (!dialogflowResponse) {
+        console.error(`No valid Dialogflow response for ${phoneNumber}`);
+        return;
       }
-    });
-    
-    return true;
-  } catch (error) {
-    console.error('Error sending WhatsApp message:', error);
-    console.error('Error details:', error.response ? error.response.data : error.message);
-    return false;
+      
+      console.log(`Sending WhatsApp message to ${phoneNumber}, type: ${dialogflowResponse.type}`);
+      
+      // Use WhatsAppService instead of direct API calls
+      let result;
+      
+      switch (dialogflowResponse.type) {
+        case 'text':
+          result = await WhatsAppService.sendText(
+            phoneNumber, 
+            dialogflowResponse.text,
+            dialogflowResponse.previewUrl || false
+          );
+          break;
+          
+        case 'interactive_buttons':
+          result = await WhatsAppService.sendButtons(
+            phoneNumber,
+            dialogflowResponse.text,
+            dialogflowResponse.buttons,
+            dialogflowResponse.header || null,
+            dialogflowResponse.footer || null
+          );
+          break;
+          
+        case 'interactive_list':
+          result = await WhatsAppService.sendList(
+            phoneNumber,
+            dialogflowResponse.text,
+            dialogflowResponse.button || 'View Options',
+            dialogflowResponse.sectionTitle || 'Options',
+            dialogflowResponse.items,
+            dialogflowResponse.headerText || null,
+            dialogflowResponse.footerText || null
+          );
+          break;
+          
+        case 'location_request_message':
+          result = await WhatsAppService.sendLocationRequest(
+            phoneNumber,
+            dialogflowResponse.text
+          );
+          break;
+          
+        case 'image':
+          result = await WhatsAppService.sendImage(
+            phoneNumber,
+            dialogflowResponse.url,
+            dialogflowResponse.caption || null
+          );
+          break;
+          
+        default:
+          console.warn(`Unsupported response type: ${dialogflowResponse.type}`);
+          // Fall back to simple text message
+          result = await WhatsAppService.sendText(
+            phoneNumber,
+            "I'm not sure how to respond to that. Can you try again?"
+          );
+      }
+      
+      // Check result
+      if (!result.success) {
+        console.error(`Failed to send message to ${phoneNumber}: ${result.error.message}`);
+      }
+    } catch (error) {
+      ErrorHandler.logError('sendWhatsAppMessage', error);
+    }
   }
-}
 };
 
 module.exports = WhatsAppController;
