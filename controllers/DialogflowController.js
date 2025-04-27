@@ -1,13 +1,15 @@
-// ==== FILE: controllers/DialogflowController.js ====
-const { WebhookClient } = require('dialogflow-fulfillment');
+// Updated DialogflowController.js
+const { WebhookClient, Payload } = require('dialogflow-fulfillment');
 const intentHandlers = require('../services/intentHandlers');
 
 const DialogflowController = {
   handleWebhook: (req, res) => {
     try {
-      const agent = new WebhookClient({ request: req, response: res });
       console.log('Dialogflow Request headers: ' + JSON.stringify(req.headers));
       console.log('Dialogflow Request body: ' + JSON.stringify(req.body));
+      
+      // Create a standard WebhookClient - don't use the custom one yet
+      const agent = new WebhookClient({ request: req, response: res });
       
       // Map intents to their handlers
       const intentMap = new Map();
@@ -77,6 +79,20 @@ const DialogflowController = {
 
       // Handle fallback
       intentMap.set('Default Fallback Intent', intentHandlers.fallback);
+
+      // Monkey patch the add method to handle custom WhatsApp formats
+      const originalAdd = agent.add.bind(agent);
+      agent.add = function(response) {
+        if (response && typeof response === 'object' && response.payload) {
+          // This is a custom WhatsApp response format
+          // Convert it to a Dialogflow Payload format
+          const payload = new Payload('PLATFORM_UNSPECIFIED', response.payload, { sendAsMessage: true });
+          return originalAdd(payload);
+        }
+        
+        // Handle other response types
+        return originalAdd(response);
+      };
 
       // Process request
       agent.handleRequest(intentMap);

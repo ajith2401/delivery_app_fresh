@@ -386,12 +386,14 @@ const intentHandlers = {
         'உங்கள் இருப்பிடத்தைப் பகிர்ந்து கொள்ளுங்கள்:' : 
         'Please share your location first:';
       
-      return agent.add({
-        payload: {
-          whatsapp_type: 'location_request_message',
-          text: locationText
-        }
-      });
+      // Create a payload for location request
+      const payload = {
+        whatsapp_type: 'location_request_message',
+        text: locationText
+      };
+      
+      // Return payload wrapped in an object
+      return agent.add({ payload });
     }
     
     // Get user location
@@ -444,16 +446,19 @@ const intentHandlers = {
     const buttonText = user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View';
     const sectionTitle = user.preferredLanguage === 'tamil' ? 'அருகிலுள்ள உணவகங்கள்' : 'Nearby Home Cooks';
     
-    agent.add({
-      payload: {
-        whatsapp_type: 'list',
-        text: resultsText,
-        button: buttonText,
-        sectionTitle: sectionTitle,
-        items: vendorList
-      }
-    });
+    // Create a payload for list message
+    const payload = {
+      whatsapp_type: 'list',
+      text: resultsText,
+      button: buttonText,
+      sectionTitle: sectionTitle,
+      items: vendorList
+    };
+    
+    // Return payload wrapped in an object
+    return agent.add({ payload });
   },
+  
   
   // Select vendor and show menu
   selectVendor: async (agent) => {
