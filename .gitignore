@@ -5,3 +5,5 @@ dialogflow-credentials.json
 node_modules
 
 TamilFoodsBot
+
+ConversationManager.js
