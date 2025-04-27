@@ -199,8 +199,20 @@ const intentHandlers = {
   // Process location shared by user
   processLocation: async (agent) => {
     const phoneNumber = getPhoneNumber(agent);
-    const latitude = agent.parameters.latitude;
-    const longitude = agent.parameters.longitude;
+    
+    // This should be modified to:
+    let latitude, longitude;
+    
+    // Try to extract from Dialogflow query params
+    if (agent.originalRequest && agent.originalRequest.payload && agent.originalRequest.payload.data) {
+      try {
+        const data = JSON.parse(agent.query);
+        latitude = data.latitude;
+        longitude = data.longitude;
+      } catch (e) {
+        console.error('Error parsing location data:', e);
+      }
+    }
     
     if (!latitude || !longitude) {
       return agent.add('Please share your location to continue.');

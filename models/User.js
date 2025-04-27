@@ -6,7 +6,7 @@ const addressSchema = new mongoose.Schema({
   fullAddress: { type: String, required: true },
   location: {
     type: { type: String, default: 'Point' },
-    coordinates: [Number] // [longitude, latitude]
+    coordinates: { type: [Number], required: true } // [longitude, latitude]
   }
 });
 
@@ -20,14 +20,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  addresses: [addressSchema],
+  addresses: {
+    type: [addressSchema],
+    default: [] // Ensure it always has a default empty array
+  },
   defaultAddressIndex: {
     type: Number,
     default: 0
   },
   preferredLanguage: {
     type: String,
-    enum: ['english', 'tamil']
+    enum: ['english', 'tamil'],
+    default: 'english' // Add default language
   },
   lastInteractionAt: {
     type: Date,
@@ -81,5 +85,35 @@ const userSchema = new mongoose.Schema({
 
 // Index for geospatial queries
 userSchema.index({ 'addresses.location': '2dsphere' });
+
+// Add method to add location safely
+userSchema.methods.addLocation = function(latitude, longitude, address) {
+  if (!this.addresses) {
+    this.addresses = [];
+  }
+  
+  const newAddress = {
+    label: 'Shared Location',
+    fullAddress: address || 'Location shared via WhatsApp',
+    location: {
+      type: 'Point',
+      coordinates: [longitude, latitude] // MongoDB uses [longitude, latitude] order
+    }
+  };
+  
+  this.addresses.push(newAddress);
+  this.defaultAddressIndex = this.addresses.length - 1;
+  return this;
+};
+
+// Add method to check if user has a valid location
+userSchema.methods.hasValidLocation = function() {
+  return this.addresses && 
+         this.addresses.length > 0 && 
+         this.addresses[this.defaultAddressIndex] &&
+         this.addresses[this.defaultAddressIndex].location &&
+         this.addresses[this.defaultAddressIndex].location.coordinates &&
+         this.addresses[this.defaultAddressIndex].location.coordinates.length === 2;
+};
 
 module.exports = mongoose.model('User', userSchema);

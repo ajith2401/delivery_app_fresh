@@ -53,4 +53,7 @@ const openTime = parseInt(hours.open.replace(':', ''));
 const closeTime = parseInt(hours.close.replace(':', ''));
 return currentTime >= openTime && currentTime <= closeTime;
 };
+
+vendorSchema.index({ 'address.location': '2dsphere' });
+
 module.exports = mongoose.model('Vendor', vendorSchema);

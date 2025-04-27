@@ -4,6 +4,26 @@ const DialogflowService = require('../services/DialogflowService');
 const WhatsAppMessageHelpers = require('../services/WhatsAppMessageHelpers');
 const WhatsAppService = require('../services/WhatsAppService');
 const ErrorHandler = require('../services/ErrorHandler');
+const Vendor = require('../models/Vendor');
+
+
+// Helper function to calculate distance between coordinates
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in km
+  return distance;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
+}
 
 const WhatsAppController = {
   // Verify webhook for WhatsApp Business API
@@ -64,7 +84,6 @@ const WhatsAppController = {
         await user.save();
         console.log(`Created new user for phone number: ${phoneNumber}`);
       }
-      
       // Update last interaction time
       user.lastInteractionAt = new Date();
       await user.save();
@@ -84,24 +103,39 @@ const WhatsAppController = {
         });
         
         console.log(`Received location from ${phoneNumber}: (${message.location.latitude}, ${message.location.longitude})`);
-        
-        // Save location to user profile if available
+      
+        // Save location to user profile
         if (message.location.latitude && message.location.longitude) {
-          const newAddress = {
-            label: 'Shared Location',
-            fullAddress: message.location.address || 'Location shared via WhatsApp',
-            location: {
-              type: 'Point',
-              coordinates: [message.location.longitude, message.location.latitude]
-            }
-          };
-          
-          user.addresses.push(newAddress);
-          user.defaultAddressIndex = user.addresses.length - 1;
-          await user.save();
-          console.log(`Saved location to user profile: ${phoneNumber}`);
+          try {
+            // Create the address FIRST, then use it
+            const newAddress = {
+              label: 'Shared Location',
+              fullAddress: message.location.address || 'Location shared via WhatsApp',
+              location: {
+                type: 'Point',
+                coordinates: [message.location.longitude, message.location.latitude]
+              }
+            };
+            
+            // Now push it to addresses
+            user.addresses.push(newAddress);
+            user.defaultAddressIndex = user.addresses.length - 1;
+            await user.save();
+            
+            // Fetch freshly updated user data for browsing
+            const updatedUser = await User.findOne({ phoneNumber });
+            console.log(`User address count after save: ${updatedUser.addresses.length}`);
+            console.log(`Address data: ${JSON.stringify(updatedUser.addresses[updatedUser.defaultAddressIndex])}`);
+            
+            // Skip Dialogflow and go directly to vendor browsing
+            await browseNearbyVendorsDirectly(phoneNumber, updatedUser);
+            return; // Skip further processing
+          } catch (error) {
+            console.error(`Error saving location: ${error.message}`);
+            // Fall through to normal Dialogflow handling
+          }
         }
-      } else if (message.type === 'interactive') {
+      }else if (message.type === 'interactive') {
         if (message.interactive.type === 'button_reply') {
           // Extract button ID for processing
           messageType = 'button';
@@ -244,5 +278,92 @@ const WhatsAppController = {
     }
   }
 };
+
+async function browseNearbyVendorsDirectly(phoneNumber, user) {
+  try {
+    // Add detailed logging
+    console.log('Starting browseNearbyVendorsDirectly function');
+    console.log(`User has ${user.addresses.length} addresses`);
+    
+    if (!user.addresses || user.addresses.length === 0) {
+      console.error('No addresses found for user');
+      await WhatsAppService.sendText(phoneNumber, 'Please share your location first.');
+      return;
+    }
+    
+    const userAddress = user.addresses[user.defaultAddressIndex];
+    console.log(`Using address: ${JSON.stringify(userAddress)}`);
+    
+    // Ensure we have coordinates in the right format
+    if (!userAddress.location || !userAddress.location.coordinates || 
+        !Array.isArray(userAddress.location.coordinates) || 
+        userAddress.location.coordinates.length !== 2) {
+      console.error('Invalid location coordinates:', userAddress.location);
+      await WhatsAppService.sendText(phoneNumber, 'Location data is invalid. Please share your location again.');
+      return;
+    }
+    
+    // Log the exact query we're about to perform
+    const query = {
+      isActive: true,
+      'address.location': {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: userAddress.location.coordinates
+          },
+          $maxDistance: 5000 // 5km radius
+        }
+      }
+    };
+    console.log('Vendor query:', JSON.stringify(query));
+    
+    // Find nearby vendors
+    const vendors = await Vendor.find(query).limit(10);
+    console.log(`Found ${vendors.length} nearby vendors`);
+    
+    if (vendors.length === 0) {
+      await WhatsAppService.sendText(
+        phoneNumber,
+        user.preferredLanguage === 'tamil' ? 
+          'மன்னிக்கவும், அருகிலுள்ள உணவகங்கள் எதுவும் கிடைக்கவில்லை.' : 
+          'Sorry, we couldn\'t find any home cooks near you.'
+      );
+      return;
+    }
+    
+    // Format vendors list - FIXED: use userAddress instead of userLocation
+    const vendorList = vendors.map(vendor => {
+      const distance = calculateDistance(
+        userAddress.location.coordinates[1],  // latitude is in position 1
+        userAddress.location.coordinates[0],  // longitude is in position 0
+        vendor.address.location.coordinates[1],
+        vendor.address.location.coordinates[0]
+      );
+      
+      return {
+        id: vendor._id.toString(),
+        title: `${vendor.businessName} (${(vendor.rating || 0).toFixed(1)}★)`,
+        description: `${vendor.cuisineType.join(', ')} • ${distance.toFixed(1)}km away`
+      };
+    });
+    
+    const resultsText = user.preferredLanguage === 'tamil' ? 
+      `உங்களுக்கு அருகில் ${vendors.length} உணவகங்கள் கண்டுபிடிக்கப்பட்டன. ஒன்றைத் தேர்ந்தெடுக்கவும்:` : 
+      `We found ${vendors.length} home cooks near you. Select one to view their menu:`;
+    
+    await WhatsAppService.sendList(
+      phoneNumber,
+      resultsText,
+      user.preferredLanguage === 'tamil' ? 'பார்க்க' : 'View',
+      user.preferredLanguage === 'tamil' ? 'அருகிலுள்ள உணவகங்கள்' : 'Nearby Home Cooks',
+      vendorList
+    );
+  } catch (error) {
+    console.error('Error in browseNearbyVendorsDirectly:', error);
+    console.error(error.stack);
+    await WhatsAppService.sendText(phoneNumber, 'An error occurred finding nearby vendors. Please try again.');
+  }
+}
 
 module.exports = WhatsAppController;
