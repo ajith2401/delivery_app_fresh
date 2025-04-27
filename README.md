@@ -78,6 +78,6 @@ npm start
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
-Your Name - support@tamilfoods.com
+Your Name - ajith24ram@gmail.com
 
-Project Link: [https://github.com/yourusername/tamilfoods-whatsapp-bot](https://github.com/yourusername/tamilfoods-whatsapp-bot)
+Project Link: [https://github.com/ajith2401/delivery_app_fresh](https://github.com/ajith2401/delivery_app_fresh)
