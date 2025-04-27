@@ -1,6 +1,7 @@
 // ==== FILE: services/DialogflowService.js ====
 const dialogflow = require('@google-cloud/dialogflow');
 const { v4: uuidv4 } = require('uuid');
+const WhatsAppMessageHelpers = require('./WhatsAppMessageHelpers');
 
 const DialogflowService = {
   // Detect intent from user message
@@ -158,29 +159,52 @@ const DialogflowService = {
         if (nullPayload && nullPayload.structValue && nullPayload.structValue.fields) {
           const fields = nullPayload.structValue.fields;
           
+          // Process different types of WhatsApp messages
+          
           // Check for interactive payload (buttons, lists, etc.)
           if (fields.type && fields.type.stringValue === 'interactive') {
-            const interactive = fields.interactive.structValue.fields;
-            const interactiveType = interactive.type.stringValue;
+            // Process interactive messages
+            return DialogflowService.processInteractiveMessage(fields);
+          }
+          
+          // Check for WhatsApp-specific payloads
+          if (fields.whatsapp_type) {
+            const whatsappType = fields.whatsapp_type.stringValue;
             
-            // Handle button type
-            if (interactiveType === 'button') {
+            // Process list type
+            if (whatsappType === 'list') {
               return {
-                type: 'interactive_buttons',
-                text: interactive.body.structValue.fields.text.stringValue,
-                buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
-                  id: button.structValue.fields.reply.structValue.fields.id.stringValue,
-                  text: button.structValue.fields.reply.structValue.fields.title.stringValue
-                }))
+                type: 'interactive_list',
+                text: fields.text.stringValue,
+                button: fields.button.stringValue,
+                sectionTitle: fields.sectionTitle.stringValue,
+                items: DialogflowService.extractListItems(fields.items.listValue.values)
               };
             }
             
-            // Handle location request
-            if (interactiveType === 'location_request_message') {
+            // Process buttons type
+            if (whatsappType === 'buttons') {
+              return {
+                type: 'interactive_buttons',
+                text: fields.text.stringValue,
+                buttons: DialogflowService.extractButtons(fields.buttons.listValue.values)
+              };
+            }
+            
+            // Process location request
+            if (whatsappType === 'location_request_message') {
               return {
                 type: 'location_request',
-                text: interactive.body.structValue.fields.text.stringValue,
-                action: interactive.action.structValue.fields.name.stringValue
+                text: fields.text.stringValue
+              };
+            }
+            
+            // Process image type
+            if (whatsappType === 'image') {
+              return {
+                type: 'image',
+                url: fields.url.stringValue,
+                caption: fields.caption ? fields.caption.stringValue : null
               };
             }
           }
@@ -210,7 +234,91 @@ const DialogflowService = {
       type: 'text',
       text: responseText
     };
-  }
-  };
+  },
   
-  module.exports = DialogflowService;
+  // Process interactive message from Dialogflow
+  processInteractiveMessage: (fields) => {
+    const interactive = fields.interactive.structValue.fields;
+    const interactiveType = interactive.type.stringValue;
+    
+    // Handle button type
+    if (interactiveType === 'button') {
+      // Extract button details
+      const buttonMessage = {
+        type: 'interactive_buttons',
+        text: interactive.body.structValue.fields.text.stringValue,
+        buttons: []
+      };
+      
+      // Extract buttons
+      if (interactive.action && 
+          interactive.action.structValue && 
+          interactive.action.structValue.fields && 
+          interactive.action.structValue.fields.buttons) {
+        const buttonsValues = interactive.action.structValue.fields.buttons.listValue.values;
+        buttonMessage.buttons = DialogflowService.extractButtons(buttonsValues);
+      }
+      
+      return buttonMessage;
+    }
+    
+    // Handle location request
+    if (interactiveType === 'location_request_message') {
+      return {
+        type: 'location_request',
+        text: interactive.body.structValue.fields.text.stringValue,
+        action: interactive.action.structValue.fields.name.stringValue
+      };
+    }
+    
+    // Default to text if not recognized
+    return {
+      type: 'text',
+      text: 'I didn\'t understand. Can you try again?'
+    };
+  },
+  
+  // Extract buttons from Dialogflow response
+  extractButtons: (buttonValues) => {
+    const buttons = [];
+    
+    for (const buttonValue of buttonValues) {
+      try {
+        const button = buttonValue.structValue.fields;
+        const reply = button.reply.structValue.fields;
+        
+        buttons.push({
+          id: reply.id.stringValue,
+          text: reply.title.stringValue
+        });
+      } catch (error) {
+        console.error('Error extracting button:', error);
+      }
+    }
+    
+    return buttons;
+  },
+  
+  // Extract list items from Dialogflow response
+  extractListItems: (itemValues) => {
+    const items = [];
+    
+    for (const itemValue of itemValues) {
+      try {
+        const item = itemValue.structValue.fields;
+        
+        items.push({
+          id: item.id.stringValue,
+          title: WhatsAppMessageHelpers.truncateText(item.title.stringValue, 24), // Ensure within limits
+          description: item.description ? WhatsAppMessageHelpers.truncateText(item.description.stringValue, 72) : ""
+        });
+      } catch (error) {
+        console.error('Error extracting list item:', error);
+      }
+    }
+    
+    return items;
+  }
+};
+
+module.exports = DialogflowService;

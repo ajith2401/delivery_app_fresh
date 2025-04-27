@@ -9,8 +9,6 @@ const API_VERSION = 'v22.0';
 const WhatsAppService = {
   // Send message to WhatsApp
   sendMessage: async (phoneNumber, payload) => {
-    console.log("sendMessage",payload);
-    
     try {
       const url = `https://graph.facebook.com/${API_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
       
@@ -54,7 +52,6 @@ const WhatsAppService = {
   
   // Send text message
   sendText: async (phoneNumber, text, previewUrl = false) => {
-    console.log("sendText",text);
     const payload = WhatsAppMessageHelpers.generateTextMessagePayload(
       phoneNumber, 
       text, 
@@ -66,11 +63,16 @@ const WhatsAppService = {
   
   // Send interactive buttons
   sendButtons: async (phoneNumber, text, buttons, header = null, footer = null) => {
-    console.log("sendButtons",{text, buttons});
+    // Process buttons to ensure they meet WhatsApp API requirements
+    const processedButtons = buttons.map(button => ({
+      id: button.id,
+      text: WhatsAppMessageHelpers.truncateText(button.text, 20) // WhatsApp limits button text to 20 chars
+    })).slice(0, 3); // WhatsApp allows maximum 3 buttons
+    
     const payload = WhatsAppMessageHelpers.generateButtonsMessagePayload(
       phoneNumber,
       text,
-      buttons,
+      processedButtons,
       header,
       footer
     );
@@ -80,13 +82,19 @@ const WhatsAppService = {
   
   // Send interactive list
   sendList: async (phoneNumber, text, buttonText, sectionTitle, items, headerText = null, footerText = null) => {
-    console.log("sendList",{phoneNumber, text, buttonText, sectionTitle, items})
+    // Process items to ensure they meet WhatsApp API requirements
+    const processedItems = items.map(item => ({
+      id: item.id,
+      title: WhatsAppMessageHelpers.truncateText(item.title, 24), // WhatsApp limits row title to 24 chars
+      description: item.description ? WhatsAppMessageHelpers.truncateText(item.description, 72) : "" // WhatsApp limits row description to 72 chars
+    })).slice(0, 10); // WhatsApp allows maximum 10 items in a list
+    
     const payload = WhatsAppMessageHelpers.generateListMessagePayload(
       phoneNumber,
       text,
       buttonText,
       sectionTitle,
-      items,
+      processedItems,
       headerText,
       footerText
     );
@@ -94,9 +102,20 @@ const WhatsAppService = {
     return WhatsAppService.sendMessage(phoneNumber, payload);
   },
   
+  // Send location request
+  sendLocationRequest: async (phoneNumber, text) => {
+    const payload = WhatsAppMessageHelpers.generateLocationRequestPayload(phoneNumber, text);
+    return WhatsAppService.sendMessage(phoneNumber, payload);
+  },
+  
+  // Send image message
+  sendImage: async (phoneNumber, imageUrl, caption = null) => {
+    const payload = WhatsAppMessageHelpers.generateImageMessagePayload(phoneNumber, imageUrl, caption);
+    return WhatsAppService.sendMessage(phoneNumber, payload);
+  },
+  
   // Send order confirmation
   sendOrderConfirmation: async (phoneNumber, order) => {
-    console.log("sendOrderConfirmation",{order});
     // Generate order details text
     let orderDetails = `🛒 *Order Confirmed!*\nOrder ID: ${order._id}\n\n*Items:*\n`;
     
@@ -119,8 +138,6 @@ const WhatsAppService = {
   
   // Send order status update
   sendOrderStatusUpdate: async (phoneNumber, order) => {
-    console.log("sendOrderStatusUpdate",{phoneNumber, order});
-    
     let statusText = '';
     const status = order.orderStatus;
     
@@ -149,36 +166,18 @@ const WhatsAppService = {
   
   // Send payment link
   sendPaymentLink: async (phoneNumber, order, paymentLink) => {
-    console.log("sendPaymentLink",{phoneNumber, order, paymentLink})
     const text = `💳 *Complete Your Payment*\nPlease use the link below to pay ₹${order.grandTotal} for your order #${order._id}:\n\n${paymentLink}\n\nYour order will be processed once payment is complete.`;
     return WhatsAppService.sendText(phoneNumber, text, true); // Enable link preview
   },
   
   // Send payment confirmation
   sendPaymentConfirmation: async (phoneNumber, order) => {
-    console.log("sendPaymentConfirmation",{phoneNumber, order})
     const text = `✅ *Payment Successful*\nWe've received your payment of ₹${order.grandTotal} for order #${order._id}. Your food will be prepared soon!`;
     return WhatsAppService.sendText(phoneNumber, text);
   },
   
-  // Send location request
-  sendLocationRequest: async (phoneNumber, text) => {
-    console.log("sendLocationRequest",{phoneNumber, text})
-    const payload = WhatsAppMessageHelpers.generateLocationRequestPayload(phoneNumber, text);
-    return WhatsAppService.sendMessage(phoneNumber, payload);
-  },
-  
-  // Send image message
-  sendImage: async (phoneNumber, imageUrl, caption = null) => {
-    console.log("sendImage",{phoneNumber, imageUrl});
-    
-    const payload = WhatsAppMessageHelpers.generateImageMessagePayload(phoneNumber, imageUrl, caption);
-    return WhatsAppService.sendMessage(phoneNumber, payload);
-  },
-  
   // Send feedback request
   sendFeedbackRequest: async (phoneNumber, order) => {
-    console.log("sendFeedbackRequest",{phoneNumber, order});
     const text = `How was your experience with your order from ${order.vendorName || 'our restaurant'}? Your feedback helps us improve!`;
     const buttons = [
       { id: 'feedback_5', text: '⭐⭐⭐⭐⭐' },

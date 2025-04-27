@@ -155,9 +155,6 @@ const WhatsAppController = {
   
   // Send message to WhatsApp
   sendWhatsAppMessage: async (phoneNumber, dialogflowResponse) => {
-    console.log('dialogflowResponse====================================');
-    console.dir(dialogflowResponse,{depth : null});
-    console.log('====================================');
     try {
       if (!dialogflowResponse) {
         console.error(`No valid Dialogflow response for ${phoneNumber}`);
@@ -179,31 +176,45 @@ const WhatsAppController = {
           break;
           
         case 'interactive_buttons':
+          // Ensure buttons are properly formatted with length limits
+          const buttons = dialogflowResponse.buttons.map(button => ({
+            id: button.id,
+            text: WhatsAppMessageHelpers.truncateText(button.text, 20) // Max 20 chars for button text
+          })).slice(0, 3); // Max 3 buttons allowed
+          
           result = await WhatsAppService.sendButtons(
             phoneNumber,
-            dialogflowResponse.text,
-            dialogflowResponse.buttons,
+            WhatsAppMessageHelpers.truncateText(dialogflowResponse.text, 1024), // Max 1024 chars for body text
+            buttons,
             dialogflowResponse.header || null,
             dialogflowResponse.footer || null
           );
           break;
           
         case 'interactive_list':
+          // Ensure list items are properly formatted with length limits
+          const items = dialogflowResponse.items.map(item => ({
+            id: item.id,
+            title: WhatsAppMessageHelpers.truncateText(item.title, 24), // Max 24 chars for row title
+            description: item.description ? WhatsAppMessageHelpers.truncateText(item.description, 72) : "" // Max 72 chars for description
+          })).slice(0, 10); // Max 10 items allowed
+          
           result = await WhatsAppService.sendList(
             phoneNumber,
-            dialogflowResponse.text,
-            dialogflowResponse.button || 'View Options',
-            dialogflowResponse.sectionTitle || 'Options',
-            dialogflowResponse.items,
-            dialogflowResponse.headerText || null,
-            dialogflowResponse.footerText || null
+            WhatsAppMessageHelpers.truncateText(dialogflowResponse.text, 1024), // Max 1024 chars for body text
+            WhatsAppMessageHelpers.truncateText(dialogflowResponse.button || 'View Options', 20), // Max 20 chars for button text
+            WhatsAppMessageHelpers.truncateText(dialogflowResponse.sectionTitle || 'Options', 24), // Max 24 chars for section title
+            items,
+            dialogflowResponse.headerText ? WhatsAppMessageHelpers.truncateText(dialogflowResponse.headerText, 60) : null, // Max 60 chars for header
+            dialogflowResponse.footerText ? WhatsAppMessageHelpers.truncateText(dialogflowResponse.footerText, 60) : null // Max 60 chars for footer
           );
           break;
           
+        case 'location_request':
         case 'location_request_message':
           result = await WhatsAppService.sendLocationRequest(
             phoneNumber,
-            dialogflowResponse.text
+            WhatsAppMessageHelpers.truncateText(dialogflowResponse.text, 1024) // Max 1024 chars for body text
           );
           break;
           
@@ -211,7 +222,7 @@ const WhatsAppController = {
           result = await WhatsAppService.sendImage(
             phoneNumber,
             dialogflowResponse.url,
-            dialogflowResponse.caption || null
+            dialogflowResponse.caption ? WhatsAppMessageHelpers.truncateText(dialogflowResponse.caption, 1024) : null // Max 1024 chars for caption
           );
           break;
           
