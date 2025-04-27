@@ -11,6 +11,41 @@ const dialogflowRoutes = require('./routes/dialogflow');
 const vendorRoutes = require('./routes/vendors');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
+const axios = require('axios');
+
+async function getAddressFromCoordinates(lat, lng) {
+  const GMAP_API_KEY = process.env.GMAP_API_KEY
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GMAP_API_KEY}`;
+
+  try {
+    const response = await axios.get(url);
+    const data = response.data;
+
+    if (data.status === 'OK' && data.results.length > 0) {
+      // Take the first result
+      const address = data.results[0].formatted_address;
+      console.log('Address:', address);
+      return address;
+    } else {
+      console.log('No address found');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error calling Google API:', error.message);
+    return null;
+  }
+}
+ 
+
+(async () => {
+    const lat = 12.8699252;
+    const lng = 77.6694071;
+    
+    const address = await getAddressFromCoordinates(lat, lng);
+    console.log('Final Address:', address);
+  })();
+ 
+
 // Load environment variables
 dotenv.config();
 // Initialize Express app
