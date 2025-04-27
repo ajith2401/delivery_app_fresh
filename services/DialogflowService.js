@@ -63,24 +63,67 @@ const DialogflowService = {
             },
           };
         }
-      } else if (messageType === 'interactive') {
-        // Handle button click events from WhatsApp
+      } else if (messageType === 'button') {
+        // Map button IDs to specific text queries that match your intents
+        console.log(`Processing button click with ID: ${query}`);
+        
+        // Map button IDs to intent trigger phrases
+        const buttonIdMap = {
+          'nearby_vendors': 'show me nearby vendors',
+          'search_food': 'I want to search for food',
+          'my_orders': 'show my orders',
+          'english': 'I prefer English language',
+          'tamil': 'I prefer Tamil language',
+          'payment_COD': 'I want to pay with cash on delivery',
+          'payment_ONLINE': 'I want to pay online',
+          'payment_UPI': 'I want to pay with UPI',
+          'confirm_address': 'confirm my address',
+          'new_address': 'I want to enter a new address',
+          'add_more': 'I want to add more items',
+          'clear_cart': 'clear my cart',
+          'checkout': 'proceed to checkout',
+          'view_cart': 'view my cart',
+          'help_ordering': 'help me with ordering',
+          'help_payment': 'help me with payment options',
+          'help_delivery': 'help me with delivery',
+          'contact_support': 'contact customer support',
+          'back_to_menu': 'go back to main menu'
+        };
+        
+        let intentQuery = buttonIdMap[query] || query;
+        
         queryParams = {
           session: sessionPath,
           queryInput: {
             text: {
-              text: query, // The button ID is passed as the query
+              text: intentQuery,
               languageCode: languageCode,
             },
           },
         };
       } else if (messageType === 'list_selection') {
         // Handle list selection events from WhatsApp
+        console.log(`Processing list selection with ID: ${query}`);
+        
+        // If the list item ID contains a prefix, handle it accordingly
+        let intentQuery = query;
+        
+        if (query.startsWith('item:')) {
+          intentQuery = `select item ${query.substring(5)}`;
+        } else if (query.startsWith('category:')) {
+          intentQuery = `browse category ${query.substring(9)}`;
+        } else if (query.startsWith('order:')) {
+          intentQuery = `view order ${query.substring(6)}`;
+        } else {
+          // For other list selections, use the ID directly
+          intentQuery = `select ${query}`;
+        }
+        
         queryParams = {
           session: sessionPath,
           queryInput: {
             text: {
-              text: query, // The list item ID is passed as the query
+              text: intentQuery,
               languageCode: languageCode,
             },
           },
@@ -89,10 +132,10 @@ const DialogflowService = {
       
       // Send request to Dialogflow
       const responses = await sessionClient.detectIntent(queryParams);
-      console.log('====================================');
-      console.log(responses[0].queryResult);
-      console.log('====================================');
       const result = responses[0].queryResult;
+      console.log('result====================================');
+      console.dir(result, {depth: null});
+      console.log('====================================');
       
       // Process the response
       return DialogflowService.processDialogflowResponse(result);
@@ -106,53 +149,60 @@ const DialogflowService = {
   },
   
   processDialogflowResponse: (result) => {
-    // Extract text from fulfillment messages first
+    // Check for webhook payload first
+    if (result.webhookPayload && result.webhookPayload.fields) {
+      try {
+        // Try to extract the payload from the null field (common in Dialogflow)
+        const nullPayload = result.webhookPayload.fields.null;
+        
+        if (nullPayload && nullPayload.structValue && nullPayload.structValue.fields) {
+          const fields = nullPayload.structValue.fields;
+          
+          // Check for interactive payload (buttons, lists, etc.)
+          if (fields.type && fields.type.stringValue === 'interactive') {
+            const interactive = fields.interactive.structValue.fields;
+            const interactiveType = interactive.type.stringValue;
+            
+            // Handle button type
+            if (interactiveType === 'button') {
+              return {
+                type: 'interactive_buttons',
+                text: interactive.body.structValue.fields.text.stringValue,
+                buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
+                  id: button.structValue.fields.reply.structValue.fields.id.stringValue,
+                  text: button.structValue.fields.reply.structValue.fields.title.stringValue
+                }))
+              };
+            }
+            
+            // Handle location request
+            if (interactiveType === 'location_request_message') {
+              return {
+                type: 'location_request',
+                text: interactive.body.structValue.fields.text.stringValue,
+                action: interactive.action.structValue.fields.name.stringValue
+              };
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing webhook payload:', error);
+      }
+    }
+    
+    // If no payload or error in processing it, handle fulfillment messages
+    // Extract text from fulfillment messages
     let responseText = '';
     const messages = result.fulfillmentMessages || [];
     const textMessages = messages
       .filter(msg => msg.message === 'text' && msg.text && msg.text.text && msg.text.text.length > 0)
       .map(msg => msg.text.text[0])
-      .filter(text => text); // Filter out empty messages
+      .filter(text => text);
     
     if (textMessages.length > 0) {
       responseText = textMessages.join('\n\n');
     } else {
-      // Fallback to fulfillmentText if no text messages
       responseText = result.fulfillmentText || 'I didn\'t understand. Can you try again?';
-    }
-  
-    // Check for webhook payload
-    if (result.webhookPayload && result.webhookPayload.fields) {
-      const nullPayload = result.webhookPayload.fields.null;
-      if (nullPayload && nullPayload.structValue) {
-        const payloadFields = nullPayload.structValue.fields;
-        
-        // Check if it's an interactive payload
-        if (payloadFields.type && payloadFields.type.stringValue === 'interactive' && payloadFields.interactive) {
-          const interactive = payloadFields.interactive.structValue.fields;
-          const buttonType = interactive.type.stringValue;
-          
-          if (buttonType === 'button') {
-            return {
-              type: 'interactive_buttons',
-              text: interactive.body.structValue.fields.text.stringValue,
-              buttons: interactive.action.structValue.fields.buttons.listValue.values.map(button => ({
-                id: button.structValue.fields.reply.structValue.fields.id.stringValue,
-                text: button.structValue.fields.reply.structValue.fields.title.stringValue
-              }))
-            };
-          }
-          
-          // Add location request handling
-          if (buttonType === 'location_request_message') {
-            return {
-              type: 'location_request',
-              text: interactive.body.structValue.fields.text.stringValue,
-              action: interactive.action.structValue.fields.name.stringValue
-            };
-          }
-        }
-      }
     }
   
     // Default response as text

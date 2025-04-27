@@ -103,11 +103,13 @@ const WhatsAppController = {
         }
       } else if (message.type === 'interactive') {
         if (message.interactive.type === 'button_reply') {
+          // Extract button ID for processing
           messageType = 'button';
           messageText = message.interactive.button_reply.id;
           
           console.log(`User ${phoneNumber} clicked button: ${messageText} (${message.interactive.button_reply.title})`);
         } else if (message.interactive.type === 'list_reply') {
+          // Extract list selection ID for processing
           messageType = 'list_selection';
           messageText = message.interactive.list_reply.id;
           
@@ -128,19 +130,34 @@ const WhatsAppController = {
         messageType,
         user.preferredLanguage || 'english'
       );
-
-      console.log({dialogflowResponse});
-      
+  
+      // Log the response before sending
+      console.log('dialogflowResponse====================================');
+      console.dir(dialogflowResponse, {depth: null});
+      console.log('====================================');
       
       // Send response back to WhatsApp
       await WhatsAppController.sendWhatsAppMessage(phoneNumber, dialogflowResponse);
     } catch (error) {
       ErrorHandler.logError('processMessage', error);
+      
+      // Try to notify user of error
+      try {
+        await WhatsAppService.sendText(
+          phoneNumber, 
+          "I'm sorry, I encountered an error processing your message. Please try again later."
+        );
+      } catch (sendError) {
+        console.error('Failed to send error message:', sendError);
+      }
     }
   },
   
   // Send message to WhatsApp
   sendWhatsAppMessage: async (phoneNumber, dialogflowResponse) => {
+    console.log('dialogflowResponse====================================');
+    console.dir(dialogflowResponse,{depth : null});
+    console.log('====================================');
     try {
       if (!dialogflowResponse) {
         console.error(`No valid Dialogflow response for ${phoneNumber}`);

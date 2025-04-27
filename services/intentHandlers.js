@@ -55,8 +55,10 @@ function getPhoneNumber(agent) {
 const intentHandlers = {
   // Welcome intent handler
   welcome: async (agent) => {
+    console.log('Welcome intent handler');
+    
     const phoneNumber = getPhoneNumber(agent);
-    let payload;
+    
     // Find or create user
     let user = await User.findOne({ phoneNumber });
     
@@ -64,17 +66,13 @@ const intentHandlers = {
       user = new User({ phoneNumber });
       await user.save();
       
-      // First-time user
-      agent.add('வணக்கம்! Welcome to TamilFoods! 🍲');
-      agent.add('I can help you order delicious home-cooked food from nearby cooks.');
-      
-      // Ask for language preference
+      // First-time user message with language selection
       const languagePayload = {
         type: 'interactive',
         interactive: {
           type: 'button',
           body: {
-            text: 'Please select your preferred language:'
+            text: 'வணக்கம்! Welcome to TamilFoods! 🍲\n\nI can help you order delicious home-cooked food from nearby cooks.\n\nPlease select your preferred language:'
           },
           action: {
             buttons: [
@@ -96,84 +94,63 @@ const intentHandlers = {
           }
         }
       };
-      console.log('====================================');
-      console.log('agent,{depth:null}====================================');
-      console.dir(agent, { depth: null });
       
       agent.add(new Payload('PLATFORM_UNSPECIFIED', languagePayload));
-      payload = languagePayload;
-      return languagePayload
+      
     } else {
-      // Returning user
+      // Returning user message with main menu
       const greeting = user.preferredLanguage === 'tamil' ? 
-        'வணக்கம்! மீண்டும் வருக! 🍲' : 
-        'Welcome back to TamilFoods! 🍲';
-      
-      agent.add(greeting);
-      
-      // Show main menu
-      const menuText = user.preferredLanguage === 'tamil' ? 
-        'நான் எப்படி உதவ முடியும்?' :
-        'How can I help you today?';
+        'வணக்கம்! மீண்டும் வருக! 🍲\n\nநான் எப்படி உதவ முடியும்?' : 
+        'Welcome back to TamilFoods! 🍲\n\nHow can I help you today?';
       
       const optionTexts = user.preferredLanguage === 'tamil' ? 
         [
           'அருகிலுள்ள உணவகங்கள்',
           'உணவைத் தேடு',
-          'எனது ஆர்டர்கள்',
-          'உதவி'
+          'எனது ஆர்டர்கள்'
         ] : 
         [
           'Nearby Home Cooks',
           'Search Food',
-          'My Orders',
-          'Help'
+          'My Orders'
         ];
       
-        const menuPayload = {
-          type: 'interactive',
-          interactive: {
-            type: 'button',
-            body: {
-              text: menuText
-            },
-            action: {
-              buttons: [
-                {
-                  type: 'reply',
-                  reply: {
-                    id: 'nearby_vendors',
-                    title: optionTexts[0]
-                  }
-                },
-                {
-                  type: 'reply',
-                  reply: {
-                    id: 'search_food',
-                    title: optionTexts[1]
-                  }
-                },
-                {
-                  type: 'reply',
-                  reply: {
-                    id: 'my_orders',
-                    title: optionTexts[2]
-                  }
-                },
-                // {
-                //   type: 'reply',
-                //   reply: {
-                //     id: 'help',
-                //     title: optionTexts[3]
-                //   }
-                // }
-              ]
-            }
+      const menuPayload = {
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: {
+            text: greeting
+          },
+          action: {
+            buttons: [
+              {
+                type: 'reply',
+                reply: {
+                  id: optionTexts[0],
+                  title: optionTexts[0]
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: optionTexts[1],
+                  title: optionTexts[1]
+                }
+              },
+              {
+                type: 'reply',
+                reply: {
+                  id: optionTexts[2],
+                  title: optionTexts[2]
+                }
+              }
+            ]
           }
-        };
-        payload = menuPayload
-        agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
-        return payload
+        }
+      };
+      
+      agent.add(new Payload('PLATFORM_UNSPECIFIED', menuPayload));
     }
   },
   
