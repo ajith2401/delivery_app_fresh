@@ -119,7 +119,6 @@ const DialogflowService = {
           // For other list selections, use the ID directly
           intentQuery = `select ${query}`;
         }
-        
         queryParams = {
           session: sessionPath,
           queryInput: {
@@ -133,11 +132,7 @@ const DialogflowService = {
       
       // Send request to Dialogflow
       const responses = await sessionClient.detectIntent(queryParams);
-      const result = responses[0].queryResult;
-      console.log('result====================================');
-      console.dir(result, {depth: null});
-      console.log('====================================');
-      
+      const result = responses[0].queryResult;      
       // Process the response
       return DialogflowService.processDialogflowResponse(result);
     } catch (error) {

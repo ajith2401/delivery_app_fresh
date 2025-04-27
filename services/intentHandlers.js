@@ -4,7 +4,7 @@ const Order = require('../models/Order');
 const PaymentController = require('../controllers/PaymentController');
 const WhatsAppService = require('./WhatsAppService');
 const {WebhookClient, Payload } = require('dialogflow-fulfillment');
-
+const fs = require('fs').promises
 
 // Helper function to calculate distance between coordinates
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -475,17 +475,26 @@ const intentHandlers = {
   // Select vendor and show menu
   selectVendor: async (agent) => {
     const phoneNumber = getPhoneNumber(agent);
-    const vendorId = agent.parameters.vendor_id;
-    
+    const agentDataToSave = {
+      session: agent.session,
+      query: agent.query,
+      parameters: agent.parameters,
+      contexts: agent.contexts,
+      // Add more fields if needed
+  };
+
+    const vendorId = agent.query.split(" ")[1] || agent.parameters.vendor_id;
+
     if (!vendorId) {
       return agent.add('Please select a home cook to view their menu.');
     }
     
     const user = await User.findOne({ phoneNumber });
     if (!user) return agent.add('Sorry, something went wrong. Please try again.');
-    
+
     // Get vendor details
     const vendor = await Vendor.findById(vendorId);
+    
     if (!vendor) {
       return agent.add('Sorry, this home cook is no longer available.');
     }
